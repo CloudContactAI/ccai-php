@@ -1,0 +1,57 @@
+{
+    "name": "cloudcontactai/ccai-php",
+    "description": "PHP client for CloudContactAI API",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CloudContactAI LLC"
+        }
+    ],
+    "keywords": [
+        "sms",
+        "api",
+        "client",
+        "cloud",
+        "contact",
+        "ai",
+        "cloudcontactai"
+    ],
+    "require": {
+        "php": ">=8.1",
+        "guzzlehttp/guzzle": "^7.7",
+        "psr/http-client": "^1.0",
+        "psr/http-message": "^1.0",
+        "psr/log": "^3.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "phpstan/phpstan": "^1.10",
+        "squizlabs/php_codesniffer": "^3.7",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "CloudContactAI\\CCAI\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CloudContactAI\\CCAI\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpcs": "phpcs --standard=PSR12 src tests",
+        "phpstan": "phpstan analyse src tests --level=8",
+        "check": [
+            "@phpcs",
+            "@phpstan",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}
