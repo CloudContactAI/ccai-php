@@ -11,20 +11,19 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
 use CloudContactAI\CCAI\SMS\Account;
-use CloudContactAI\CCAI\SMS\SMSResponse;
 
 // Create a new CCAI client
 $ccai = new CCAI([
-    'clientId' => 'YOUR-CLIENT-ID',
-    'apiKey' => 'API-KEY-TOKEN'
+    'clientId' => getenv('CCAI_CLIENT_ID') ?: 'YOUR_CLIENT_ID',
+    'apiKey' => getenv('CCAI_API_KEY') ?: 'YOUR_API_KEY'
 ]);
 
 // Example recipients
 $accounts = [
     new Account(
-        firstName: 'John',
-        lastName: 'Doe',
-        phone: '+15551234567'  // Use E.164 format
+        'John',
+        'Doe',
+        '+15555555555'  // Example E.164 format phone number
     )
 ];
 
@@ -33,7 +32,7 @@ $arrayAccounts = [
     [
         'firstName' => 'John',
         'lastName' => 'Doe',
-        'phone' => '+15551234567'  // Use E.164 format
+        'phone' => '+15555555555'  // Use E.164 format
     ]
 ];
 
@@ -54,9 +53,9 @@ function sendMessages(): array
         // Method 1: Send SMS to multiple recipients
         echo 'Sending campaign to multiple recipients...' . PHP_EOL;
         $campaignResponse = $ccai->sms->send(
-            accounts: $accounts,
-            message: $message,
-            title: $title
+            $accounts,
+            $message,
+            $title
         );
         echo 'SMS campaign sent successfully!' . PHP_EOL;
         print_r($campaignResponse->toArray());
@@ -64,11 +63,11 @@ function sendMessages(): array
         // Method 2: Send SMS to a single recipient
         echo PHP_EOL . 'Sending message to a single recipient...' . PHP_EOL;
         $singleResponse = $ccai->sms->sendSingle(
-            firstName: 'Jane',
-            lastName: 'Smith',
-            phone: '+15559876543',
-            message: 'Hi ${firstName}, thanks for your interest!',
-            title: 'Single Message Test'
+            'Jane',
+            'Smith',
+            '+15555555555',
+            'Hi ${firstName}, thanks for your interest!',
+            'Single Message Test'
         );
         echo 'Single SMS sent successfully!' . PHP_EOL;
         print_r($singleResponse->toArray());

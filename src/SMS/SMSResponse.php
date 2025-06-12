@@ -19,7 +19,7 @@ class SMSResponse
     /**
      * @var string|null Message ID
      */
-    public ?string $id = null;
+    public ?int $id = null;
 
     /**
      * @var string|null Message status

@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace CloudContactAI\CCAI;
 
 use CloudContactAI\CCAI\SMS\SMS;
+use CloudContactAI\CCAI\SMS\MMS;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
@@ -26,15 +27,33 @@ use RuntimeException;
 class CCAIConfig
 {
     /**
+     * @var string Client ID for authentication
+     */
+    public string $clientId;
+    
+    /**
+     * @var string API key for authentication
+     */
+    public string $apiKey;
+    
+    /**
+     * @var string Base URL for the API
+     */
+    public string $baseUrl;
+    
+    /**
      * @param string $clientId Client ID for authentication
      * @param string $apiKey API key for authentication
      * @param string $baseUrl Base URL for the API
      */
     public function __construct(
-        public readonly string $clientId,
-        public readonly string $apiKey,
-        public readonly string $baseUrl = 'https://core.cloudcontactai.com/api'
+        string $clientId,
+        string $apiKey,
+        string $baseUrl = 'https://core.cloudcontactai.com/api'
     ) {
+        $this->clientId = $clientId;
+        $this->apiKey = $apiKey;
+        $this->baseUrl = $baseUrl;
     }
 }
 
@@ -56,7 +75,12 @@ class CCAI
     /**
      * @var SMS SMS service
      */
-    public readonly SMS $sms;
+    public $sms;
+    
+    /**
+     * @var MMS MMS service
+     */
+    public $mms;
 
     /**
      * Create a new CCAI client instance
@@ -77,13 +101,14 @@ class CCAI
         }
 
         $this->config = new CCAIConfig(
-            clientId: $config['clientId'],
-            apiKey: $config['apiKey'],
-            baseUrl: $config['baseUrl'] ?? 'https://core.cloudcontactai.com/api'
+            $config['clientId'],
+            $config['apiKey'],
+            $config['baseUrl'] ?? 'https://core.cloudcontactai.com/api'
         );
 
         $this->httpClient = $httpClient ?? new Client();
         $this->sms = new SMS($this);
+        $this->mms = new MMS($this);
     }
 
     /**

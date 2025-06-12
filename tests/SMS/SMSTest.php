@@ -49,9 +49,9 @@ class SMSTest extends TestCase
     {
         // Sample account
         $account = new Account(
-            firstName: 'John',
-            lastName: 'Doe',
-            phone: '+15551234567'
+            'John',
+            'Doe',
+            '+15551234567'
         );
 
         // Sample message and title
@@ -189,9 +189,9 @@ class SMSTest extends TestCase
     {
         // Sample account
         $account = new Account(
-            firstName: 'John',
-            lastName: 'Doe',
-            phone: '+15551234567'
+            'John',
+            'Doe',
+            '+15551234567'
         );
 
         // Sample message and title

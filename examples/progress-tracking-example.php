@@ -21,9 +21,9 @@ $ccai = new CCAI([
 
 // Example recipient
 $account = new Account(
-    firstName: 'John',
-    lastName: 'Doe',
-    phone: '+15551234567'  // Use E.164 format
+    'John',
+    'Doe',
+    '+15551234567'  // Use E.164 format
 );
 
 // Message with variable placeholders
