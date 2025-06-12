@@ -82,71 +82,46 @@ echo "Campaign sent with ID: " . $campaignResponse->campaignId . "\n";
 ```php
 <?php
 
-require 'vendor/autoload.php';
+/**
+ * Simple example of sending an MMS message using the CCAI PHP library
+ */
+
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
-use CloudContactAI\CCAI\SMS\Account;
-use CloudContactAI\CCAI\SMS\SMSOptions;
 
-// Initialize the client
+// Replace with your actual credentials
 $ccai = new CCAI([
-    'clientId' => 'YOUR-CLIENT-ID',
-    'apiKey' => 'YOUR-API-KEY'
+    'clientId' => getenv('CCAI_CLIENT_ID') ?: 'YOUR_CLIENT_ID',
+    'apiKey' => getenv('CCAI_API_KEY') ?: 'YOUR_API_KEY'
 ]);
 
-// Method 1: All-in-one approach - Upload image and send MMS in one step
-$imagePath = '/path/to/your/image.png';
+// Path to the image file you want to send
+$filename = 'AllCode.png';
+$imagePath = __DIR__ . '/AllCode.png';
 $contentType = 'image/png';
 
-// Create an account for the recipient
-$account = new Account('John', 'Doe', '+15551234567');
-
-// Optional: Create options with a progress callback
-$options = new SMSOptions(
-    timeout: 60,
-    onProgress: function ($status) {
-        echo "Status: $status\n";
-    }
-);
-
-// Send MMS with image in one step
-$response = $ccai->mms->sendWithImage(
-    $imagePath,
-    $contentType,
-    [$account],
-    'Hi ${firstName}, check out this image!',
-    'MMS Campaign'
-);
-
-echo "MMS sent successfully! Campaign ID: " . $response->campaignId . "\n";
-
-// Method 2: Step-by-step approach
-// Step 1: Get a signed URL for uploading the image
-$uploadResponse = $ccai->mms->getSignedUploadUrl(
-    'image.png',
-    'image/png'
-);
-
-$signedUrl = $uploadResponse['url'];
-$fileKey = $uploadResponse['fileKey'];
-
-// Step 2: Upload the image to the signed URL
-$uploadSuccess = $ccai->mms->uploadImageToSignedUrl(
-    $signedUrl,
-    $imagePath,
-    'image/png'
-);
-
-// Step 3: Send the MMS with the uploaded image
-$response = $ccai->mms->send(
-    $fileKey,
-    [$account],
-    'Hi ${firstName}, check out this image!',
-    'MMS Campaign',
-    $options
-);
-
-echo "MMS sent successfully! Campaign ID: " . $response->campaignId . "\n";
+try {
+    // Send an MMS to a single recipient
+    $response = $ccai->mms->sendWithImage(
+        $imagePath,
+        $contentType,
+        [
+            [
+                'firstName' => 'Jane',
+                'lastName' => 'Doe',
+                'phone' => '+15555555555'
+            ]
+        ],
+        'Hi ${firstName} ${lastName}, testing a new campaign',
+        'MMS Content Test Message'
+    );
+    
+    echo "MMS sent successfully! ID: " . $response->id . "\n";
+    
+} catch (\Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
 ```
 
 ## Features
