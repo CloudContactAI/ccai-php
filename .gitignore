@@ -1,0 +1,23 @@
+# Composer dependencies
+/vendor/
+
+# Environment files that might contain secrets
+.env
+*.env
+
+# IDE files
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# Logs
+*.log
