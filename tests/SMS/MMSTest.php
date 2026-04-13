@@ -49,6 +49,7 @@ class MMSTest extends TestCase
         $this->ccai->shouldReceive('getClientId')->andReturn('test-client-id');
         $this->ccai->shouldReceive('getApiKey')->andReturn('test-api-key');
         $this->ccai->shouldReceive('getBaseUrl')->andReturn('https://core.cloudcontactai.com/api');
+        $this->ccai->shouldReceive('getFilesBaseUrl')->andReturn('https://files.cloudcontactai.com');
 
         $this->httpClient = Mockery::mock(Client::class);
         
@@ -507,14 +508,19 @@ class MMSTest extends TestCase
     }
 
     /**
-     * Test the complete MMS workflow
+     * Test the complete MMS workflow (new upload)
      */
     public function testSendWithImage(): void
     {
         // Create a temporary test file
         $tempFile = tempnam(sys_get_temp_dir(), 'mms_test_');
         file_put_contents($tempFile, 'test image content');
-        
+
+        // Calculate expected MD5
+        $expectedMd5 = md5_file($tempFile);
+        $expectedFileName = "{$expectedMd5}.tmp";
+        $expectedFileKey = "test-client-id/campaign/{$expectedFileName}";
+
         // Sample account
         $account = new Account(
             'John',
@@ -525,20 +531,29 @@ class MMSTest extends TestCase
         // Sample message and title
         $message = 'Hello ${firstName}, check out this image!';
         $title = 'MMS Test Campaign';
-        
+
+        // Mock checkFileUploaded response (file not found, needs upload)
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->with(
+                'GET',
+                "/clients/test-client-id/storedUrl?fileKey={$expectedFileKey}"
+            )
+            ->andReturn(['storedUrl' => '']);
+
         // Mock getSignedUploadUrl response
         $mockUploadUrlResponse = new Response(
             200,
             ['Content-Type' => 'application/json'],
             json_encode([
                 'signedS3Url' => 'https://s3.amazonaws.com/test-bucket/test-file.png?signature=abc123',
-                'fileKey' => 'test-client-id/campaign/test-file.png'
+                'fileKey' => $expectedFileKey
             ])
         );
-        
+
         // Mock uploadImageToSignedUrl response
         $mockUploadResponse = new Response(200);
-        
+
         // Mock send response
         $mockSendResponse = new Response(
             200,
@@ -549,21 +564,20 @@ class MMSTest extends TestCase
                 'campaignId' => 'camp-456'
             ])
         );
-        
+
         // Set up expectations for getSignedUploadUrl
         $this->httpClient->shouldReceive('request')
             ->once()
             ->with(
                 'POST',
                 'https://files.cloudcontactai.com/upload/url',
-                Mockery::on(function ($arg) {
-                    return isset($arg['json']['fileName']) && 
-                           isset($arg['json']['fileType']) && 
-                           $arg['json']['fileType'] === 'image/png';
+                Mockery::on(function ($arg) use ($expectedFileName) {
+                    return isset($arg['json']['fileName']) &&
+                           $arg['json']['fileName'] === $expectedFileName;
                 })
             )
             ->andReturn($mockUploadUrlResponse);
-            
+
         // Set up expectations for uploadImageToSignedUrl
         $this->httpClient->shouldReceive('request')
             ->once()
@@ -571,25 +585,25 @@ class MMSTest extends TestCase
                 'PUT',
                 'https://s3.amazonaws.com/test-bucket/test-file.png?signature=abc123',
                 Mockery::on(function ($arg) {
-                    return isset($arg['headers']['Content-Type']) && 
+                    return isset($arg['headers']['Content-Type']) &&
                            $arg['headers']['Content-Type'] === 'image/png';
                 })
             )
             ->andReturn($mockUploadResponse);
-            
+
         // Set up expectations for send
         $this->httpClient->shouldReceive('request')
             ->once()
             ->with(
                 'POST',
                 'https://core.cloudcontactai.com/api/clients/test-client-id/campaigns/direct',
-                Mockery::on(function ($arg) {
-                    return isset($arg['json']['pictureFileKey']) && 
-                           $arg['json']['pictureFileKey'] === 'test-client-id/campaign/test-file.png';
+                Mockery::on(function ($arg) use ($expectedFileKey) {
+                    return isset($arg['json']['pictureFileKey']) &&
+                           $arg['json']['pictureFileKey'] === $expectedFileKey;
                 })
             )
             ->andReturn($mockSendResponse);
-        
+
         // Create progress tracking callback
         $progressUpdates = [];
         $progressCallback = function (string $status) use (&$progressUpdates) {
@@ -602,7 +616,7 @@ class MMSTest extends TestCase
             null,
             $progressCallback
         );
-        
+
         // Call the method
         $response = $this->mms->sendWithImage(
             $tempFile,
@@ -612,18 +626,152 @@ class MMSTest extends TestCase
             $title,
             $options
         );
-        
+
         // Verify response
         $this->assertEquals('msg-123', $response->id);
         $this->assertEquals('sent', $response->status);
         $this->assertEquals('camp-456', $response->campaignId);
-        
+
         // Verify progress updates
+        $this->assertContains('Checking if image already uploaded', $progressUpdates);
         $this->assertContains('Getting signed upload URL', $progressUpdates);
         $this->assertContains('Uploading image to S3', $progressUpdates);
         $this->assertContains('Image uploaded successfully, sending MMS', $progressUpdates);
-        
+
         // Clean up
         unlink($tempFile);
+    }
+
+    /**
+     * Test the complete MMS workflow with cached image (skip upload)
+     */
+    public function testSendWithImageCacheHit(): void
+    {
+        // Create a temporary test file
+        $tempFile = tempnam(sys_get_temp_dir(), 'mms_test_');
+        file_put_contents($tempFile, 'test image content');
+
+        // Calculate expected MD5
+        $expectedMd5 = md5_file($tempFile);
+        $expectedFileName = "{$expectedMd5}.tmp";
+        $expectedFileKey = "test-client-id/campaign/{$expectedFileName}";
+
+        // Sample account
+        $account = new Account(
+            'John',
+            'Doe',
+            '+15551234567'
+        );
+
+        // Sample message and title
+        $message = 'Hello ${firstName}, check out this image!';
+        $title = 'MMS Test Campaign';
+
+        // Mock checkFileUploaded response (file already exists — cache hit)
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->with(
+                'GET',
+                "/clients/test-client-id/storedUrl?fileKey={$expectedFileKey}"
+            )
+            ->andReturn(['storedUrl' => 'https://s3.amazonaws.com/test-bucket/' . $expectedFileName]);
+
+        // Mock send response (only call expected — no upload calls)
+        $mockSendResponse = new Response(
+            200,
+            ['Content-Type' => 'application/json'],
+            json_encode([
+                'id' => 'msg-456',
+                'status' => 'sent',
+                'campaignId' => 'camp-789'
+            ])
+        );
+
+        // Set up expectations for send (should be the only HTTP call)
+        $this->httpClient->shouldReceive('request')
+            ->once()
+            ->with(
+                'POST',
+                'https://core.cloudcontactai.com/api/clients/test-client-id/campaigns/direct',
+                Mockery::on(function ($arg) use ($expectedFileKey) {
+                    return isset($arg['json']['pictureFileKey']) &&
+                           $arg['json']['pictureFileKey'] === $expectedFileKey;
+                })
+            )
+            ->andReturn($mockSendResponse);
+
+        // Create progress tracking callback
+        $progressUpdates = [];
+        $progressCallback = function (string $status) use (&$progressUpdates) {
+            $progressUpdates[] = $status;
+        };
+
+        // Create options
+        $options = new SMSOptions(
+            null,
+            null,
+            $progressCallback
+        );
+
+        // Call the method
+        $response = $this->mms->sendWithImage(
+            $tempFile,
+            'image/png',
+            [$account],
+            $message,
+            $title,
+            $options
+        );
+
+        // Verify response
+        $this->assertEquals('msg-456', $response->id);
+        $this->assertEquals('sent', $response->status);
+        $this->assertEquals('camp-789', $response->campaignId);
+
+        // Verify progress — cache hit should skip upload steps
+        $this->assertContains('Checking if image already uploaded', $progressUpdates);
+        $this->assertContains('Image already exists in S3, sending MMS', $progressUpdates);
+        // Should NOT contain upload-related progress
+        $this->assertNotContains('Getting signed upload URL', $progressUpdates);
+        $this->assertNotContains('Uploading image to S3', $progressUpdates);
+
+        // Clean up
+        unlink($tempFile);
+    }
+
+    /**
+     * Test checkFileUploaded returns storedUrl when file exists
+     */
+    public function testCheckFileUploadedReturnsStoredUrl(): void
+    {
+        $fileKey = 'test-client-id/campaign/abc123.jpg';
+
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->with(
+                'GET',
+                '/clients/test-client-id/storedUrl?fileKey=' . $fileKey
+            )
+            ->andReturn(['storedUrl' => 'https://s3.amazonaws.com/test-bucket/abc123.jpg']);
+
+        $result = $this->mms->checkFileUploaded($fileKey);
+
+        $this->assertEquals('https://s3.amazonaws.com/test-bucket/abc123.jpg', $result['storedUrl']);
+    }
+
+    /**
+     * Test checkFileUploaded returns empty on error
+     */
+    public function testCheckFileUploadedReturnsEmptyOnError(): void
+    {
+        $fileKey = 'test-client-id/campaign/nonexistent.jpg';
+
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->andThrow(new \RuntimeException('API error'));
+
+        $result = $this->mms->checkFileUploaded($fileKey);
+
+        $this->assertEquals(['storedUrl' => ''], $result);
     }
 }

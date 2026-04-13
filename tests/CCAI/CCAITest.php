@@ -22,7 +22,7 @@ use RuntimeException;
 class CCAITest extends TestCase
 {
     /**
-     * Test client initialization
+     * Test client initialization with production URLs (default)
      */
     public function testInitialization(): void
     {
@@ -30,21 +30,50 @@ class CCAITest extends TestCase
         $apiKey = 'test-api-key';
         $ccai = new CCAI([
             'clientId' => $clientId,
-            'apiKey' => $apiKey
+            'apiKey'   => $apiKey,
         ]);
 
         $this->assertEquals($clientId, $ccai->getClientId());
         $this->assertEquals($apiKey, $ccai->getApiKey());
+        $this->assertFalse($ccai->isTestEnvironment());
         $this->assertEquals('https://core.cloudcontactai.com/api', $ccai->getBaseUrl());
+        $this->assertEquals('https://email-campaigns.cloudcontactai.com/api/v1', $ccai->getEmailBaseUrl());
+        $this->assertEquals('https://files.cloudcontactai.com', $ccai->getFilesBaseUrl());
+    }
 
-        // Test custom base URL
-        $customUrl = 'https://custom.api.example.com';
+    /**
+     * Test client initialization with test environment URLs
+     */
+    public function testInitializationTestEnvironment(): void
+    {
         $ccai = new CCAI([
-            'clientId' => $clientId,
-            'apiKey' => $apiKey,
-            'baseUrl' => $customUrl
+            'clientId'           => 'test-client-id',
+            'apiKey'             => 'test-api-key',
+            'useTestEnvironment' => true,
         ]);
-        $this->assertEquals($customUrl, $ccai->getBaseUrl());
+
+        $this->assertTrue($ccai->isTestEnvironment());
+        $this->assertEquals('https://core-test-cloudcontactai.allcode.com/api', $ccai->getBaseUrl());
+        $this->assertEquals('https://email-campaigns-test-cloudcontactai.allcode.com/api/v1', $ccai->getEmailBaseUrl());
+        $this->assertEquals('https://files-test-cloudcontactai.allcode.com', $ccai->getFilesBaseUrl());
+    }
+
+    /**
+     * Test client initialization with custom URL overrides
+     */
+    public function testInitializationCustomUrls(): void
+    {
+        $ccai = new CCAI([
+            'clientId'    => 'test-client-id',
+            'apiKey'      => 'test-api-key',
+            'baseUrl'     => 'https://custom.api.example.com',
+            'emailBaseUrl'=> 'https://custom.email.example.com',
+            'filesBaseUrl'=> 'https://custom.files.example.com',
+        ]);
+
+        $this->assertEquals('https://custom.api.example.com', $ccai->getBaseUrl());
+        $this->assertEquals('https://custom.email.example.com', $ccai->getEmailBaseUrl());
+        $this->assertEquals('https://custom.files.example.com', $ccai->getFilesBaseUrl());
     }
 
     /**

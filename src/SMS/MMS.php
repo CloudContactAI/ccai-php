@@ -86,7 +86,7 @@ class MMS
         try {
             $response = $this->httpClient->request(
                 'POST',
-                'https://files.cloudcontactai.com/upload/url',
+                $this->ccai->getFilesBaseUrl() . '/upload/url',
                 [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $this->ccai->getApiKey(),
@@ -188,6 +188,7 @@ class MMS
         array $accounts,
         string $message,
         string $title,
+        ?string $senderPhone = null,
         ?SMSOptions $options = null,
         bool $forceNewCampaign = true
     ): SMSResponse {
@@ -250,6 +251,10 @@ class MMS
             'title' => $title
         ];
 
+        if ($senderPhone !== null && $senderPhone !== '') {
+            $campaignData['senderPhone'] = $senderPhone;
+        }
+
         try {
             // Notify progress if callback provided
             $options->notifyProgress('Sending MMS');
@@ -299,6 +304,8 @@ class MMS
      * @param string $phone Recipient's phone number (E.164 format)
      * @param string $message Message content (can include ${firstName} and ${lastName} variables)
      * @param string $title Campaign title
+     * @param string|null $customData Optional arbitrary string forwarded to your webhook handler (sent as messageData)
+     * @param string|null $senderPhone Optional sender phone number
      * @param SMSOptions|null $options Optional settings for the MMS send operation
      * @param bool $forceNewCampaign Whether to force a new campaign (default: true)
      * 
@@ -311,16 +318,19 @@ class MMS
         string $phone,
         string $message,
         string $title,
+        ?string $customData = null,
+        ?string $senderPhone = null,
         ?SMSOptions $options = null,
         bool $forceNewCampaign = true
     ): SMSResponse {
-        $account = new Account($firstName, $lastName, $phone);
+        $account = new Account($firstName, $lastName, $phone, null, $customData);
 
         return $this->send(
             $pictureFileKey,
             [$account],
             $message,
             $title,
+            $senderPhone,
             $options,
             $forceNewCampaign
         );
@@ -334,11 +344,12 @@ class MMS
      * @param array $accounts Array of Account objects or arrays
      * @param string $message Message content (can include ${firstName} and ${lastName} variables)
      * @param string $title Campaign title
+     * @param string|null $senderPhone Optional sender phone number
      * @param SMSOptions|null $options Optional settings for the MMS send operation
      * @param bool $forceNewCampaign Whether to force a new campaign (default: true)
-     * 
+     *
      * @return SMSResponse API response
-     * 
+     *
      * @throws InvalidArgumentException If required parameters are missing or invalid
      * @throws RuntimeException If any step of the process fails
      */
@@ -348,44 +359,98 @@ class MMS
         array $accounts,
         string $message,
         string $title,
+        ?string $senderPhone = null,
         ?SMSOptions $options = null,
         bool $forceNewCampaign = true
     ): SMSResponse {
         // Create options if not provided
         $options = $options ?? new SMSOptions();
 
-        // Step 1: Get the file name from the path
-        $fileName = basename($imagePath);
-        
-        // Notify progress if callback provided
+        // Step 1: Compute MD5 of the image file for caching
+        $md5Image = $this->md5File($imagePath);
+        $extension = strtolower(pathinfo($imagePath, PATHINFO_EXTENSION));
+        $fileName = "{$md5Image}.{$extension}";
+        $fileKey = $this->ccai->getClientId() . "/campaign/{$fileName}";
+
+        // Step 2: Check if the same image has already been uploaded
+        $options->notifyProgress('Checking if image already uploaded');
+        $storedUrlResponse = $this->checkFileUploaded($fileKey);
+
+        if (!empty($storedUrlResponse['storedUrl'])) {
+            // Image already uploaded, skip upload and send directly
+            $options->notifyProgress('Image already exists in S3, sending MMS');
+            return $this->send(
+                $fileKey,
+                $accounts,
+                $message,
+                $title,
+                $senderPhone,
+                $options,
+                $forceNewCampaign
+            );
+        }
+
+        // Step 3: Get a signed URL for uploading
         $options->notifyProgress('Getting signed upload URL');
-        
-        // Step 2: Get a signed URL for uploading
         $uploadResponse = $this->getSignedUploadUrl($fileName, $contentType);
         $signedUrl = $uploadResponse['signedS3Url'];
-        $fileKey = $uploadResponse['fileKey'];
-        
-        // Notify progress if callback provided
+
+        // Step 4: Upload the image to the signed URL
         $options->notifyProgress('Uploading image to S3');
-        
-        // Step 3: Upload the image to the signed URL
         $uploadSuccess = $this->uploadImageToSignedUrl($signedUrl, $imagePath, $contentType);
-        
+
         if (!$uploadSuccess) {
             throw new RuntimeException('Failed to upload image to S3');
         }
-        
-        // Notify progress if callback provided
+
+        // Step 5: Send the MMS with the uploaded image
         $options->notifyProgress('Image uploaded successfully, sending MMS');
-        
-        // Step 4: Send the MMS with the uploaded image
         return $this->send(
             $fileKey,
             $accounts,
             $message,
             $title,
+            $senderPhone,
             $options,
             $forceNewCampaign
         );
+    }
+
+    /**
+     * Calculate the MD5 hash of a file
+     *
+     * @param string $filePath Path to the file
+     * @return string MD5 hash in hexadecimal format
+     *
+     * @throws RuntimeException If the file cannot be read
+     */
+    private function md5File(string $filePath): string
+    {
+        $hash = md5_file($filePath);
+
+        if ($hash === false) {
+            throw new RuntimeException('Failed to calculate MD5 hash of file: ' . $filePath);
+        }
+
+        return $hash;
+    }
+
+    /**
+     * Check if a file has already been uploaded to S3
+     *
+     * @param string $fileKey The S3 file key to check
+     * @return array Response containing 'storedUrl' (empty string if not found)
+     */
+    public function checkFileUploaded(string $fileKey): array
+    {
+        try {
+            $clientId = $this->ccai->getClientId();
+            return $this->ccai->request(
+                'GET',
+                "/clients/{$clientId}/storedUrl?fileKey={$fileKey}"
+            );
+        } catch (\Exception $e) {
+            return ['storedUrl' => ''];
+        }
     }
 }

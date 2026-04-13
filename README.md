@@ -190,6 +190,33 @@ $response = $ccai->email->sendCampaign($campaign, $options);
 echo "Campaign sent successfully!\n";
 ```
 
+### Managing Contacts
+
+Manage opt-out preferences for contacts.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Opt a contact out of text messages (by phone number)
+$result = $ccai->contact->setDoNotText(true, null, '+15551234567');
+echo "Opted out: " . json_encode($result) . "\n";
+
+// Opt a contact back in
+$ccai->contact->setDoNotText(false, null, '+15551234567');
+
+// Opt out by contactId
+$ccai->contact->setDoNotText(true, 'contact-abc-123', null);
+```
+
 ### Webhooks
 
 ```php
@@ -198,9 +225,8 @@ echo "Campaign sent successfully!\n";
 require 'vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
-use CloudContactAI\CCAI\WebhookConfig;
-use CloudContactAI\CCAI\WebhookEventType;
-use CloudContactAI\CCAI\Webhook;
+use CloudContactAI\CCAI\Webhook\WebhookConfig;
+use CloudContactAI\CCAI\Webhook\WebhookEventType;
 
 // Initialize the client
 $ccai = new CCAI([
@@ -208,35 +234,63 @@ $ccai = new CCAI([
     'apiKey' => 'YOUR-API-KEY'
 ]);
 
-// Register a webhook
+// Example 1: Register a webhook with auto-generated secret
+// If secret is not provided, the server will auto-generate one
 $config = new WebhookConfig(
     url: 'https://your-domain.com/api/ccai-webhook',
-    events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED],
-    secret: 'your-webhook-secret'
+    events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED]
+    // secret is optional - server will auto-generate and return it
 );
-
 $webhook = $ccai->webhook->register($config);
-echo "Webhook registered with ID: {$webhook->id}\n";
+
+echo "Webhook registered with ID: {$webhook['id']}\n";
+echo "Auto-generated Secret: {$webhook['secretKey']}\n";
+
+// Example 2: Register a webhook with a custom secret
+$configCustom = new WebhookConfig(
+    url: 'https://your-domain.com/api/ccai-webhook-v2',
+    secret: 'your-custom-secret-key',
+    events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED]
+);
+$webhookWithCustomSecret = $ccai->webhook->register($configCustom);
+
+echo "Webhook with custom secret registered: {$webhookWithCustomSecret['id']}\n";
 
 // List all webhooks
 $webhooks = $ccai->webhook->list();
 echo "Found " . count($webhooks) . " webhooks\n";
 
-// Create webhook handler
-$handlers = [
-    'onMessageSent' => function($event) {
-        echo "Message sent: {$event->message} to {$event->to}\n";
-    },
-    'onMessageReceived' => function($event) {
-        echo "Message received: {$event->message} from {$event->from}\n";
-    }
-];
+// Update a webhook
+$updated = $ccai->webhook->update($webhook['id'], [
+    'url' => 'https://your-domain.com/api/new-webhook-endpoint'
+]);
 
-$webhookHandler = Webhook::createHandler($handlers);
+echo "Webhook updated: {$updated['url']}\n";
 
-// Use in your web application
-// $payload = json_decode(file_get_contents('php://input'), true);
-// $result = $webhookHandler($payload);
+// Delete a webhook
+$ccai->webhook->delete($webhook['id']);
+echo "Webhook deleted\n";
+
+// Verify webhook signature in your HTTP handler
+$signature = $_SERVER['HTTP_X_CCAI_SIGNATURE'] ?? '';
+$body = file_get_contents('php://input');
+$secret = 'your-webhook-secret-key'; // Use the secret returned during registration
+
+// Parse the webhook payload to get client_id and event_hash
+$payload = json_decode($body, true);
+$clientId = getenv('CCAI_CLIENT_ID');
+$eventHash = $payload['eventHash'] ?? '';
+
+if ($ccai->webhook->verifySignature($signature, $clientId, $eventHash, $secret)) {
+    // Signature is valid, process the webhook
+    $event = $ccai->webhook->parseWebhookEvent($body);
+    echo "Webhook event type: {$event['eventType']}\n";
+    echo "Webhook data: " . json_encode($event['data']) . "\n";
+} else {
+    http_response_code(401);
+    echo "Invalid signature\n";
+    exit;
+}
 ```
 
 ### Example Files
@@ -265,16 +319,24 @@ This repository includes example files for sending SMS, MMS, and Email messages:
 ## Features
 
 - Send SMS messages to single or multiple recipients
-- Send MMS messages with images
+- Send MMS messages with images (automatic S3 upload)
 - Send Email campaigns with HTML content
 - Schedule emails for future delivery
-- Webhook management (register, update, list, delete)
+- Manage contact opt-out preferences (setDoNotText)
+- Webhook management: register, update, list, delete
 - Webhook event handling for web frameworks
-- Variable substitution in messages (${firstName}, ${lastName})
+- Webhook signature verification (HMAC-SHA256 with Base64 encoding)
+- Template variable substitution (`${firstName}`, `${lastName}`)
 - Progress tracking callbacks
 - Type hints for better IDE integration
 - Comprehensive error handling
 - PSR-7 and PSR-18 compliant
+
+## Removed Functionality
+
+The following methods have been removed as they do not exist in the backend API:
+- `SMS::getCampaignStatus()` - Use backend API directly for campaign status
+- `Email::getCampaignStatus()` - Use backend API directly for campaign status
 
 ## License
 

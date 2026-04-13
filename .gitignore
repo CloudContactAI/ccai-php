@@ -35,3 +35,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Real API tests — local only
+test_real.php
+run_tests.php
