@@ -1,0 +1,12 @@
+.git
+.github
+vendor/
+.phpunit.cache/
+tests/
+examples/
+*.md
+LICENSE
+.env
+.env.*
+*.log
+FETCH_HEAD
