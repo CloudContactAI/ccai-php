@@ -1,7 +1,7 @@
 <?php
 
 /**
- * SMSResponse.php - Response model for SMS operations
+ * CampaignStatusResponse.php - Response model for campaign status queries
  *
  * @license MIT
  * @copyright 2025 CloudContactAI LLC
@@ -12,44 +12,34 @@ declare(strict_types=1);
 namespace CloudContactAI\CCAI\SMS;
 
 /**
- * Response from the SMS API
+ * Response from the campaign status API
  */
-class SMSResponse
+class CampaignStatusResponse
 {
     /**
-     * @var string|null Message ID
+     * @var string Campaign ID
      */
-    public int|string|null $id = null;
+    public string $id;
 
     /**
-     * @var string|null Message status
+     * @var string Campaign status (e.g. 'completed', 'in_progress', 'failed')
      */
-    public ?string $status = null;
+    public string $status;
 
     /**
-     * @var string|null Campaign ID
+     * @var int Total number of messages in the campaign
      */
-    public ?string $campaignId = null;
+    public int $totalMessages;
 
     /**
-     * @var int|null Number of messages sent
+     * @var int Number of messages sent successfully
      */
-    public ?int $messagesSent = null;
+    public int $sentMessages;
 
     /**
-     * @var string|null Timestamp of the operation
+     * @var int Number of messages that failed
      */
-    public ?string $timestamp = null;
-
-    /**
-     * @var string|null Human-readable message from the API
-     */
-    public ?string $message = null;
-
-    /**
-     * @var string|null Unique response identifier
-     */
-    public ?string $responseId = null;
+    public int $failedMessages;
 
     /**
      * @var array Additional data from the API
@@ -57,19 +47,17 @@ class SMSResponse
     private array $additionalData = [];
 
     /**
-     * Create a new SMSResponse instance
+     * Create a new CampaignStatusResponse instance
      *
      * @param array $data Response data from the API
      */
     public function __construct(array $data)
     {
-        $this->id = $data['id'] ?? null;
-        $this->status = $data['status'] ?? null;
-        $this->campaignId = $data['campaignId'] ?? $data['campaign_id'] ?? null;
-        $this->messagesSent = $data['messagesSent'] ?? $data['messages_sent'] ?? null;
-        $this->timestamp = $data['timestamp'] ?? null;
-        $this->message = $data['message'] ?? null;
-        $this->responseId = $data['responseId'] ?? null;
+        $this->id = $data['id'] ?? '';
+        $this->status = $data['status'] ?? '';
+        $this->totalMessages = (int) ($data['totalMessages'] ?? $data['total_messages'] ?? 0);
+        $this->sentMessages = (int) ($data['sentMessages'] ?? $data['sent_messages'] ?? 0);
+        $this->failedMessages = (int) ($data['failedMessages'] ?? $data['failed_messages'] ?? 0);
 
         // Store all data for access via __get
         $this->additionalData = $data;
@@ -79,7 +67,7 @@ class SMSResponse
      * Magic getter for additional data
      *
      * @param string $name Property name
-     * 
+     *
      * @return mixed Property value or null if not found
      */
     public function __get(string $name)
@@ -87,8 +75,8 @@ class SMSResponse
         $camelCase = $name;
         $snakeCase = $this->camelToSnake($name);
 
-        return $this->additionalData[$camelCase] 
-            ?? $this->additionalData[$snakeCase] 
+        return $this->additionalData[$camelCase]
+            ?? $this->additionalData[$snakeCase]
             ?? null;
     }
 
@@ -96,7 +84,7 @@ class SMSResponse
      * Convert camelCase to snake_case
      *
      * @param string $input camelCase string
-     * 
+     *
      * @return string snake_case string
      */
     private function camelToSnake(string $input): string

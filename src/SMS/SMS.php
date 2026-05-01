@@ -41,13 +41,14 @@ class SMS
      * @param array $accounts Array of Account objects or arrays
      * @param string $message Message content (can include ${firstName} and ${lastName} variables)
      * @param string $title Campaign title
+     * @param string|null $senderPhone Optional sender phone number override
      * @param SMSOptions|null $options Optional settings for the SMS send operation
      * 
      * @return SMSResponse API response
      * 
      * @throws InvalidArgumentException If required parameters are missing or invalid
      */
-    public function send(array $accounts, string $message, string $title, ?SMSOptions $options = null): SMSResponse
+    public function send(array $accounts, string $message, string $title, ?string $senderPhone = null, ?SMSOptions $options = null): SMSResponse
     {
         // Validate inputs
         if (empty($accounts)) {
@@ -102,6 +103,9 @@ class SMS
             'message' => $message,
             'title' => $title
         ];
+        if ($senderPhone !== null) {
+            $campaignData['senderPhone'] = $senderPhone;
+        }
 
         try {
             // Notify progress if callback provided
@@ -136,6 +140,8 @@ class SMS
      * @param string $phone Recipient's phone number (E.164 format)
      * @param string $message Message content (can include ${firstName} and ${lastName} variables)
      * @param string $title Campaign title
+     * @param string|null $customData Optional custom data forwarded to webhook (sent as messageData)
+     * @param string|null $senderPhone Optional sender phone number override
      * @param SMSOptions|null $options Optional settings for the SMS send operation
      * 
      * @return SMSResponse API response
@@ -146,10 +152,13 @@ class SMS
         string $phone,
         string $message,
         string $title,
+        ?string $customData = null,
+        ?string $senderPhone = null,
         ?SMSOptions $options = null
     ): SMSResponse {
-        $account = new Account($firstName, $lastName, $phone);
+        $account = new Account($firstName, $lastName, $phone, null, $customData);
 
-        return $this->send([$account], $message, $title, $options);
+        return $this->send([$account], $message, $title, $senderPhone, $options);
     }
+
 }

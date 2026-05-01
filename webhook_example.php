@@ -3,69 +3,60 @@
 require 'vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
-use CloudContactAI\CCAI\WebhookConfig;
-use CloudContactAI\CCAI\WebhookEventType;
-use CloudContactAI\CCAI\Webhook;
 
 // Initialize the client
 $ccai = new CCAI([
-    'clientId' => '2682',
-    'apiKey' => 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJpbmZvQGFsbGNvZGUuY29tIiwiaXNzIjoiY2xvdWRjb250YWN0IiwibmJmIjoxNzE5NDQwMjM2LCJpYXQiOjE3MTk0NDAyMzYsInJvbGUiOiJVU0VSIiwiY2xpZW50SWQiOjI2ODIsImlkIjoyNzY0LCJ0eXBlIjoiQVBJX0tFWSIsImtleV9yYW5kb21faWQiOiI1MGRiOTUzZC1hMjUxLTRmZjMtODI5Yi01NjIyOGRhOGE1YTAifQ.PKVjXYHdjBMum9cTgLzFeY2KIb9b2tjawJ0WXalsb8Bckw1RuxeiYKS1bw5Cc36_Rfmivze0T7r-Zy0PVj2omDLq65io0zkBzIEJRNGDn3gx_AqmBrJ3yGnz9s0WTMr2-F1TFPUByzbj1eSOASIKeI7DGufTA5LDrRclVkz32Oo'
+    'clientId' => getenv('CCAI_CLIENT_ID') ?: 'YOUR_CLIENT_ID',
+    'apiKey' => getenv('CCAI_API_KEY') ?: 'YOUR_API_KEY'
 ]);
 
 try {
-    // Example 1: Register a webhook
-    echo "1. Registering webhook...\n";
-    $config = new WebhookConfig(
-        url: 'https://your-domain.com/api/ccai-webhook',
-        events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED],
-        secret: 'your-webhook-secret'
-    );
-    
-    $webhook = $ccai->webhook->register($config);
-    echo "Webhook registered with ID: {$webhook->id}\n";
-    
+    // Example 1: Register a webhook with auto-generated secret
+    echo "1. Registering webhook (server will auto-generate secret)...\n";
+    $webhook = $ccai->webhook->register([
+        'url' => 'https://your-domain.com/api/ccai-webhook'
+    ]);
+
+    echo "Webhook registered with ID: {$webhook['id']}\n";
+    echo "Auto-generated Secret Key: {$webhook['secretKey']}\n";
+
     // Example 2: List all webhooks
     echo "\n2. Listing all webhooks...\n";
     $webhooks = $ccai->webhook->list();
     echo "Found " . count($webhooks) . " webhooks\n";
-    
-    // Example 3: Update webhook
-    echo "\n3. Updating webhook...\n";
-    $updateData = [
-        'events' => [WebhookEventType::MESSAGE_RECEIVED]
-    ];
-    $updatedWebhook = $ccai->webhook->update($webhook->id, $updateData);
-    echo "Webhook updated successfully\n";
-    
-    // Example 4: Delete webhook
-    echo "\n4. Deleting webhook...\n";
-    $result = $ccai->webhook->delete($webhook->id);
-    echo "Webhook deleted successfully\n";
-    
+
+    // Example 3: Register a webhook with custom secret
+    echo "\n3. Registering webhook with custom secret...\n";
+    $webhookCustom = $ccai->webhook->register([
+        'url' => 'https://your-domain.com/api/ccai-webhook-v2',
+        'secretKey' => 'my-custom-secret-key'
+    ]);
+    echo "Webhook with custom secret registered with ID: {$webhookCustom['id']}\n";
+
+    // Example 4: Update webhook
+    echo "\n4. Updating webhook...\n";
+    $updatedWebhook = $ccai->webhook->update($webhook['id'], [
+        'url' => 'https://your-domain.com/api/ccai-webhook-v3'
+    ]);
+    echo "Webhook updated to URL: {$updatedWebhook['url']}\n";
+
+    // Example 5: Delete webhook
+    echo "\n5. Deleting webhook...\n";
+    $result = $ccai->webhook->delete($webhook['id']);
+    if ($result['success']) {
+        echo "Webhook deleted successfully\n";
+    }
+
 } catch (Exception $e) {
-    echo "Webhook operations failed (this is expected if webhook endpoints don't exist): " . $e->getMessage() . "\n";
+    echo "Webhook operations failed: " . $e->getMessage() . "\n";
 }
 
-// Example 5: Create webhook handler
-echo "\n5. Creating webhook handler...\n";
+// Example 6: Signature verification example
+echo "\n6. Signature Verification Example...\n";
 
-$handlers = [
-    'onMessageSent' => function($event) {
-        echo "Message sent: {$event->message} to {$event->to}\n";
-        echo "Campaign: {$event->campaign->title} (ID: {$event->campaign->id})\n";
-    },
-    'onMessageReceived' => function($event) {
-        echo "Message received: {$event->message} from {$event->from}\n";
-        echo "Campaign: {$event->campaign->title} (ID: {$event->campaign->id})\n";
-    }
-];
-
-$webhookHandler = Webhook::createHandler($handlers);
-
-// Example webhook payload for testing
-$testPayload = [
-    'type' => WebhookEventType::MESSAGE_SENT,
+$webhookSecret = 'my-webhook-secret-key';
+$webhookPayload = json_encode([
+    'type' => 'message.sent',
     'campaign' => [
         'id' => 12345,
         'title' => 'Test Campaign',
@@ -77,10 +68,19 @@ $testPayload = [
     'from' => '+15551234567',
     'to' => '+15559876543',
     'message' => 'Hello, this is a test message!'
-];
+]);
 
-echo "Testing webhook handler with sample payload...\n";
-$result = $webhookHandler($testPayload);
-var_dump($result);
+// Compute the expected signature
+$expectedSignature = hash_hmac('sha256', $webhookPayload, $webhookSecret);
+
+// Verify the signature
+$isValid = $ccai->webhook->verifySignature($expectedSignature, $webhookPayload, $webhookSecret);
+echo "Signature verification result: " . ($isValid ? "VALID" : "INVALID") . "\n";
+
+// Parse the webhook event
+$event = $ccai->webhook->parseWebhookEvent($webhookPayload);
+echo "Parsed event type: {$event['type']}\n";
+echo "Campaign ID: {$event['campaign']['id']}\n";
+echo "Message: {$event['message']}\n";
 
 echo "\nWebhook functionality demonstration completed!\n";

@@ -13,6 +13,7 @@ namespace CloudContactAI\CCAI\Tests\SMS;
 
 use CloudContactAI\CCAI\CCAI;
 use CloudContactAI\CCAI\SMS\Account;
+use CloudContactAI\CCAI\SMS\SMS;
 use CloudContactAI\CCAI\SMS\SMSOptions;
 use InvalidArgumentException;
 use Mockery;
@@ -32,6 +33,7 @@ class SMSTest extends TestCase
     {
         $this->ccai = Mockery::mock(CCAI::class);
         $this->ccai->shouldReceive('getClientId')->andReturn('test-client-id');
+        $this->ccai->sms = new SMS($this->ccai);
     }
 
     /**
@@ -256,6 +258,75 @@ class SMSTest extends TestCase
     }
 
     /**
+     * Test that data and customData are sent as data/messageData (API wire format)
+     */
+    public function testSendWithCustomFieldsAndCustomData(): void
+    {
+        $account = new Account(
+            'John',
+            'Doe',
+            '+15551234567',
+            ['city' => 'Miami', 'country' => 'USA', 'plan' => 'premium'],
+            '{"source":"php-sdk-test"}'
+        );
+
+        $message = 'Hello ${firstName} from ${city}!';
+        $title = 'Test data';
+
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->with(
+                'POST',
+                '/clients/test-client-id/campaigns/direct',
+                \Mockery::on(function ($payload) {
+                    $acc = $payload['accounts'][0];
+                    return $acc['firstName'] === 'John'
+                        && $acc['phone'] === '+15551234567'
+                        && $acc['data'] === ['city' => 'Miami', 'country' => 'USA', 'plan' => 'premium']
+                        && $acc['messageData'] === '{"source":"php-sdk-test"}'
+                        && !isset($acc['customData']);
+                }),
+                30
+            )
+            ->andReturn([
+                'id' => 'msg-cf-123',
+                'status' => 'sent',
+                'message' => 'SMS sent successfully',
+                'responseId' => 'resp-abc-456'
+            ]);
+
+        $response = $this->ccai->sms->send([$account], $message, $title);
+
+        $this->assertEquals('msg-cf-123', $response->id);
+        $this->assertEquals('SMS sent successfully', $response->message);
+        $this->assertEquals('resp-abc-456', $response->responseId);
+    }
+
+    /**
+     * Test that SMSResponse exposes message and responseId fields
+     */
+    public function testResponseMessageAndResponseId(): void
+    {
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->andReturn([
+                'id' => 'msg-123',
+                'status' => 'sent',
+                'message' => 'SMS sent successfully',
+                'responseId' => 'resp-id-xyz'
+            ]);
+
+        $response = $this->ccai->sms->send(
+            accounts: [new Account('John', 'Doe', '+15551234567')],
+            message: 'Hello ${firstName}!',
+            title: 'Test'
+        );
+
+        $this->assertEquals('SMS sent successfully', $response->message);
+        $this->assertEquals('resp-id-xyz', $response->responseId);
+    }
+
+    /**
      * Test input validation
      */
     public function testValidation(): void
@@ -287,4 +358,5 @@ class SMSTest extends TestCase
             title: ''
         );
     }
+
 }
