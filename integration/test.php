@@ -3,7 +3,7 @@
 /**
  * CCAI PHP SDK Integration Tests
  *
- * Exercises all 31 public API methods against the test environment.
+ * Exercises all 42 public API methods against the test environment.
  * Exits with code 1 if any test fails.
  */
 
@@ -14,7 +14,6 @@ require_once __DIR__ . '/vendor/autoload.php';
 use CloudContactAI\CCAI\CCAI;
 use CloudContactAI\CCAI\SMS\Account as SmsAccount;
 use CloudContactAI\CCAI\Email\EmailAccount;
-
 // ---------------------------------------------------------------------------
 // Environment variables
 // ---------------------------------------------------------------------------
@@ -74,7 +73,6 @@ function runTest(string $label, callable $fn, int &$passed, int &$failed): void
 }
 
 echo "=== CCAI PHP SDK Integration Tests ===\n\n";
-
 // ---------------------------------------------------------------------------
 // SMS Tests (01–06)
 // ---------------------------------------------------------------------------
@@ -418,6 +416,179 @@ runTest('31 Contact setDoNotText (opt-in)', function () use ($client, $phone1) {
     $res = $client->contact->setDoNotText(false, null, $phone1);
     if (!is_array($res)) {
         throw new RuntimeException('Expected array response');
+    }
+}, $passed, $failed);
+
+// ---------------------------------------------------------------------------
+// Brands Tests (32–36)
+// ---------------------------------------------------------------------------
+echo "\n--- Brands ---\n";
+
+$brandId = null;
+
+runTest('32 Brand.create', function () use ($client, &$brandId) {
+    $res = $client->brands->create([
+        'legalCompanyName' => 'PHP Test Company LLC',
+        'entityType'       => 'PRIVATE_PROFIT',
+        'taxId'            => '123456789',
+        'taxIdCountry'     => 'US',
+        'country'          => 'US',
+        'verticalType'     => 'TECHNOLOGY',
+        'websiteUrl'       => 'https://test.example.com',
+        'street'           => '123 Test St',
+        'city'             => 'San Francisco',
+        'state'            => 'CA',
+        'postalCode'       => '94105',
+        'contactFirstName' => 'John',
+        'contactLastName'  => 'Doe',
+        'contactEmail'     => 'john.doe@test.example.com',
+        'contactPhone'     => '+14155551234',
+    ]);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in brand create response');
+    }
+    $brandId = (int) $res['id'];
+}, $passed, $failed);
+
+runTest('33 Brand.get', function () use ($client, &$brandId) {
+    if ($brandId === null) {
+        throw new RuntimeException('Dependency test 32 failed — skipping');
+    }
+    $res = $client->brands->get($brandId);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in brand get response');
+    }
+}, $passed, $failed);
+
+runTest('34 Brand.list', function () use ($client) {
+    $res = $client->brands->list();
+    if (!is_array($res)) {
+        throw new RuntimeException('Expected array response');
+    }
+}, $passed, $failed);
+
+runTest('35 Brand.update', function () use ($client, &$brandId) {
+    if ($brandId === null) {
+        throw new RuntimeException('Dependency test 32 failed — skipping');
+    }
+    $res = $client->brands->update($brandId, [
+        'city' => 'Los Angeles',
+    ]);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in brand update response');
+    }
+}, $passed, $failed);
+
+runTest('36 Brand.delete', function () use ($client, &$brandId) {
+    if ($brandId === null) {
+        throw new RuntimeException('Dependency test 32 failed — skipping');
+    }
+    $client->brands->delete($brandId);
+    // 204 No Content — no response body expected
+}, $passed, $failed);
+
+// ---------------------------------------------------------------------------
+// Campaigns Tests (37–42)
+// ---------------------------------------------------------------------------
+echo "\n--- Campaigns ---\n";
+
+$campaignBrandId = null;
+$campaignId      = null;
+
+runTest('37 Campaign setup — Brand.create', function () use ($client, &$campaignBrandId) {
+    $res = $client->brands->create([
+        'legalCompanyName' => 'PHP Campaign Test LLC',
+        'entityType'       => 'PRIVATE_PROFIT',
+        'taxId'            => '987654321',
+        'taxIdCountry'     => 'US',
+        'country'          => 'US',
+        'verticalType'     => 'TECHNOLOGY',
+        'websiteUrl'       => 'https://campaign-test.example.com',
+        'street'           => '456 Campaign Ave',
+        'city'             => 'New York',
+        'state'            => 'NY',
+        'postalCode'       => '10001',
+        'contactFirstName' => 'Jane',
+        'contactLastName'  => 'Smith',
+        'contactEmail'     => 'jane.smith@campaign-test.example.com',
+        'contactPhone'     => '+12125551234',
+    ]);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in brand create response');
+    }
+    $campaignBrandId = (int) $res['id'];
+}, $passed, $failed);
+
+runTest('38 Campaign.create', function () use ($client, &$campaignBrandId, &$campaignId) {
+    if ($campaignBrandId === null) {
+        throw new RuntimeException('Dependency test 37 failed — skipping');
+    }
+    $res = $client->campaigns->create([
+        'brandId'           => $campaignBrandId,
+        'useCase'           => 'MARKETING',
+        'description'       => 'PHP integration test campaign for marketing messages',
+        'messageFlow'       => 'User visits our website and opts in via the sign-up form',
+        'hasEmbeddedLinks'  => false,
+        'hasEmbeddedPhone'  => false,
+        'isAgeGated'        => false,
+        'isDirectLending'   => false,
+        'optInKeywords'     => ['START', 'YES'],
+        'optInMessage'      => 'You have opted in to receive messages. Reply STOP to unsubscribe.',
+        'optInProofUrl'     => 'https://campaign-test.example.com/opt-in',
+        'helpKeywords'      => ['HELP', 'INFO'],
+        'helpMessage'       => 'Reply HELP for assistance. Reply STOP to stop receiving messages.',
+        'optOutKeywords'    => ['STOP', 'CANCEL'],
+        'optOutMessage'     => 'You have been unsubscribed. Reply STOP to opt out.',
+        'sampleMessages'    => [
+            'Hello ${firstName}, check out our latest offers! Reply STOP to unsubscribe.',
+            'Your special discount is ready! Reply HELP for assistance.',
+        ],
+    ]);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in campaign create response');
+    }
+    $campaignId = (int) $res['id'];
+}, $passed, $failed);
+
+runTest('39 Campaign.get', function () use ($client, &$campaignId) {
+    if ($campaignId === null) {
+        throw new RuntimeException('Dependency test 38 failed — skipping');
+    }
+    $res = $client->campaigns->get($campaignId);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in campaign get response');
+    }
+}, $passed, $failed);
+
+runTest('40 Campaign.list', function () use ($client) {
+    $res = $client->campaigns->list();
+    if (!is_array($res)) {
+        throw new RuntimeException('Expected array response');
+    }
+}, $passed, $failed);
+
+runTest('41 Campaign.update', function () use ($client, &$campaignId) {
+    if ($campaignId === null) {
+        throw new RuntimeException('Dependency test 38 failed — skipping');
+    }
+    $res = $client->campaigns->update($campaignId, [
+        'description' => 'Updated PHP integration test campaign description',
+    ]);
+    if (empty($res['id'])) {
+        throw new RuntimeException('No id in campaign update response');
+    }
+}, $passed, $failed);
+
+runTest('42 Campaign.delete', function () use ($client, &$campaignId, &$campaignBrandId) {
+    if ($campaignId === null) {
+        throw new RuntimeException('Dependency test 38 failed — skipping');
+    }
+    $client->campaigns->delete($campaignId);
+    // 204 No Content — no response body expected
+
+    // Clean up the brand created for campaign tests
+    if ($campaignBrandId !== null) {
+        $client->brands->delete($campaignBrandId);
     }
 }, $passed, $failed);
 
