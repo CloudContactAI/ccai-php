@@ -18,6 +18,8 @@ use CloudContactAI\CCAI\SMS\MMS;
 use CloudContactAI\CCAI\Email\Email;
 use CloudContactAI\CCAI\Webhook\Webhook;
 use CloudContactAI\CCAI\Contact\Contact;
+use CloudContactAI\CCAI\Brands\Brand;
+use CloudContactAI\CCAI\Campaigns\Campaign;
 use CloudContactAI\CCAI\ContactValidator\ContactValidator;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -56,6 +58,11 @@ class CCAIConfig
     public string $filesBaseUrl;
 
     /**
+     * @var string Base URL for the Compliance API
+     */
+    public string $complianceBaseUrl;
+
+    /**
      * @var bool Whether the test environment is active
      */
     public bool $useTestEnvironment;
@@ -63,16 +70,18 @@ class CCAIConfig
     /**
      * Production URLs
      */
-    private const PROD_BASE_URL  = 'https://core.cloudcontactai.com/api';
-    private const PROD_EMAIL_URL = 'https://email-campaigns.cloudcontactai.com/api/v1';
-    private const PROD_FILES_URL = 'https://files.cloudcontactai.com';
+    private const PROD_BASE_URL       = 'https://core.cloudcontactai.com/api';
+    private const PROD_EMAIL_URL      = 'https://email-campaigns.cloudcontactai.com/api/v1';
+    private const PROD_FILES_URL      = 'https://files.cloudcontactai.com';
+    private const PROD_COMPLIANCE_URL = 'https://compliance.cloudcontactai.com/api';
 
     /**
      * Test environment URLs
      */
-    private const TEST_BASE_URL  = 'https://core-test-cloudcontactai.allcode.com/api';
-    private const TEST_EMAIL_URL = 'https://email-campaigns-test-cloudcontactai.allcode.com/api/v1';
-    private const TEST_FILES_URL = 'https://files-test-cloudcontactai.allcode.com';
+    private const TEST_BASE_URL       = 'https://core-test-cloudcontactai.allcode.com/api';
+    private const TEST_EMAIL_URL      = 'https://email-campaigns-test-cloudcontactai.allcode.com/api/v1';
+    private const TEST_FILES_URL      = 'https://files-test-cloudcontactai.allcode.com';
+    private const TEST_COMPLIANCE_URL = 'https://compliance-test-cloudcontactai.allcode.com/api';
 
     /**
      * @param string      $clientId           Client ID for authentication
@@ -81,6 +90,7 @@ class CCAIConfig
      * @param string|null $baseUrl            Override base URL for the core API
      * @param string|null $emailBaseUrl       Override base URL for the Email API
      * @param string|null $filesBaseUrl       Override base URL for the Files API
+     * @param string|null $complianceBaseUrl  Override base URL for the Compliance API
      */
     public function __construct(
         string $clientId,
@@ -88,7 +98,8 @@ class CCAIConfig
         bool $useTestEnvironment = false,
         ?string $baseUrl = null,
         ?string $emailBaseUrl = null,
-        ?string $filesBaseUrl = null
+        ?string $filesBaseUrl = null,
+        ?string $complianceBaseUrl = null
     ) {
         $this->clientId = $clientId;
         $this->apiKey = $apiKey;
@@ -103,6 +114,9 @@ class CCAIConfig
 
         $this->filesBaseUrl = $filesBaseUrl
             ?? getenv('CCAI_FILES_BASE_URL') ?: ($useTestEnvironment ? self::TEST_FILES_URL : self::PROD_FILES_URL);
+
+        $this->complianceBaseUrl = $complianceBaseUrl
+            ?? getenv('CCAI_COMPLIANCE_BASE_URL') ?: ($useTestEnvironment ? self::TEST_COMPLIANCE_URL : self::PROD_COMPLIANCE_URL);
     }
 }
 
@@ -147,6 +161,16 @@ class CCAI
     public $contact;
 
     /**
+     * @var Brand Brand service
+     */
+    public $brands;
+
+    /**
+     * @var Campaign Campaign service
+     */
+    public $campaigns;
+
+    /**
      * @var ContactValidator Contact validator service
      */
     public $contactValidator;
@@ -161,6 +185,7 @@ class CCAI
      *                                     - baseUrl (optional override)
      *                                     - emailBaseUrl (optional override)
      *                                     - filesBaseUrl (optional override)
+     *                                     - complianceBaseUrl (optional override)
      * @param ?ClientInterface $httpClient Optional HTTP client
      *
      * @throws RuntimeException If required configuration is missing
@@ -181,7 +206,8 @@ class CCAI
             $config['useTestEnvironment'] ?? false,
             $config['baseUrl'] ?? null,
             $config['emailBaseUrl'] ?? null,
-            $config['filesBaseUrl'] ?? null
+            $config['filesBaseUrl'] ?? null,
+            $config['complianceBaseUrl'] ?? null
         );
 
         $this->httpClient = $httpClient ?? new Client();
@@ -190,6 +216,8 @@ class CCAI
         $this->email = new Email($this);
         $this->webhook = new Webhook($this);
         $this->contact = new Contact($this);
+        $this->brands = new Brand($this);
+        $this->campaigns = new Campaign($this);
         $this->contactValidator = new ContactValidator($this);
     }
 
@@ -244,6 +272,16 @@ class CCAI
     }
 
     /**
+     * Get the base URL for the Compliance API
+     *
+     * @return string Compliance base URL
+     */
+    public function getComplianceBaseUrl(): string
+    {
+        return $this->config->complianceBaseUrl;
+    }
+
+    /**
      * Whether the test environment is active
      *
      * @return bool
@@ -288,6 +326,23 @@ class CCAI
             'AccountId' => $this->config->clientId,
             'ClientId'  => $this->config->clientId,
         ]);
+    }
+
+    /**
+     * Make an authenticated API request to the Compliance API
+     *
+     * @param string     $method   HTTP method
+     * @param string     $endpoint API endpoint (relative to complianceBaseUrl)
+     * @param array|null $data     Request body data
+     * @param int        $timeout  Request timeout in seconds
+     *
+     * @return array API response (empty array for 204 No Content responses)
+     *
+     * @throws RuntimeException If the API returns an error
+     */
+    public function complianceRequest(string $method, string $endpoint, ?array $data = null, int $timeout = 30): array
+    {
+        return $this->doRequest($this->config->complianceBaseUrl . $endpoint, $method, $data, $timeout);
     }
 
     /**
