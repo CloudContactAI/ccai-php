@@ -18,6 +18,7 @@ use CloudContactAI\CCAI\SMS\MMS;
 use CloudContactAI\CCAI\Email\Email;
 use CloudContactAI\CCAI\Webhook\Webhook;
 use CloudContactAI\CCAI\Contact\Contact;
+use CloudContactAI\CCAI\ContactValidator\ContactValidator;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
@@ -146,6 +147,11 @@ class CCAI
     public $contact;
 
     /**
+     * @var ContactValidator Contact validator service
+     */
+    public $contactValidator;
+
+    /**
      * Create a new CCAI client instance
      *
      * @param array            $config     Configuration array:
@@ -184,6 +190,7 @@ class CCAI
         $this->email = new Email($this);
         $this->webhook = new Webhook($this);
         $this->contact = new Contact($this);
+        $this->contactValidator = new ContactValidator($this);
     }
 
     /**
