@@ -29,7 +29,7 @@ class ContactValidator
      * Validate a single email address
      *
      * @param string $email Email address to validate
-     * @return array Validation result with contact, type, status and metadata
+     * @return array Validation result with contactField, type, status and metadata
      */
     public function validateEmail(string $email): array
     {
@@ -52,7 +52,7 @@ class ContactValidator
      *
      * @param string      $phone       Phone number in E.164 format (e.g. +15551234567)
      * @param string|null $countryCode Optional ISO 3166-1 alpha-2 country code (e.g. "US")
-     * @return array Validation result with contact, type, status and metadata
+     * @return array Validation result with contactField, type, status and metadata
      */
     public function validatePhone(string $phone, ?string $countryCode = null): array
     {
