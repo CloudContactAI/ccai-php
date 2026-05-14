@@ -217,6 +217,48 @@ $ccai->contact->setDoNotText(false, null, '+15551234567');
 $ccai->contact->setDoNotText(true, 'contact-abc-123', null);
 ```
 
+### Contact Validator
+
+Validate email addresses and phone numbers.
+
+> Bulk endpoints accept up to 50 contacts per request and are processed server-side in chunks.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Validate a single email
+$emailResult = $ccai->contactValidator->validateEmail('user@example.com');
+echo "Status: " . $emailResult['status'] . "\n"; // "valid" | "invalid" | "risky"
+
+// Validate multiple emails (up to 50, processed server-side in chunks)
+$bulkEmails = $ccai->contactValidator->validateEmails([
+    'user@example.com',
+    'bad@invalid.xyz'
+]);
+echo "Total: " . $bulkEmails['summary']['total'] . "\n"; // 2
+echo "Valid: " . $bulkEmails['summary']['valid'] . "\n"; // 1
+
+// Validate a single phone number
+$phoneResult = $ccai->contactValidator->validatePhone('+15551234567', 'US');
+echo "Status: " . $phoneResult['status'] . "\n"; // "valid" | "invalid" | "landline"
+
+// Validate multiple phone numbers (up to 50, processed server-side in chunks)
+$bulkPhones = $ccai->contactValidator->validatePhones([
+    ['phone' => '+15551234567'],
+    ['phone' => '+15559876543', 'countryCode' => 'US']
+]);
+echo "Landline: " . $bulkPhones['summary']['landline'] . "\n"; // 1
+```
+
 ### Webhooks
 
 ```php
@@ -323,6 +365,7 @@ This repository includes example files for sending SMS, MMS, and Email messages:
 - Send Email campaigns with HTML content
 - Schedule emails for future delivery
 - Manage contact opt-out preferences (setDoNotText)
+- Validate email addresses (valid/invalid/risky) and phone numbers (valid/invalid/landline)
 - Webhook management: register, update, list, delete
 - Webhook event handling for web frameworks
 - Webhook signature verification (HMAC-SHA256 with Base64 encoding)
