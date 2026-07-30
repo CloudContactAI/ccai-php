@@ -1,6 +1,6 @@
 # CCAI PHP Client
 
-A PHP client for interacting with the CloudContactAI API.
+A PHP client for interacting with the CloudContactAI API, with support for SMS, MMS, email campaigns, webhooks, contact management, brand registration for TCR verification, and campaign registration for TCR carrier vetting.
 
 ## Installation
 
@@ -259,6 +259,130 @@ $bulkPhones = $ccai->contactValidator->validatePhones([
 echo "Landline: " . $bulkPhones['summary']['landline'] . "\n"; // 1
 ```
 
+### Brand Registration
+
+Register and manage brands for TCR verification.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Create a brand
+$brand = $ccai->brands->create([
+    'legalCompanyName' => 'Collect.org Inc.',
+    'dba'              => 'Collect',
+    'entityType'       => 'NON_PROFIT',
+    'taxId'            => '123456789',
+    'taxIdCountry'     => 'US',
+    'country'          => 'US',
+    'verticalType'     => 'NON_PROFIT',
+    'websiteUrl'       => 'https://www.collect.org',
+    'street'           => '123 Main Street',
+    'city'             => 'San Francisco',
+    'state'            => 'CA',
+    'postalCode'       => '94105',
+    'contactFirstName' => 'Jane',
+    'contactLastName'  => 'Doe',
+    'contactEmail'     => 'jane@collect.org',
+    'contactPhone'     => '+14155551234',
+]);
+echo "Brand created with ID: " . $brand['id'] . "\n";
+
+// Get a brand by ID
+$fetched = $ccai->brands->get($brand['id']);
+echo "Website match score: " . ($fetched['websiteMatchScore'] ?? 'pending') . "\n";
+
+// List all brands
+$brands = $ccai->brands->list();
+echo "Found " . count($brands) . " brand(s)\n";
+
+// Update a brand (partial update)
+$ccai->brands->update($brand['id'], [
+    'street' => '456 Oak Avenue',
+    'city'   => 'Los Angeles',
+]);
+
+// Delete a brand
+$ccai->brands->delete($brand['id']);
+```
+
+**Entity Types:** `PRIVATE_PROFIT`, `PUBLIC_PROFIT`, `NON_PROFIT`, `GOVERNMENT`, `SOLE_PROPRIETOR`
+
+> Note: `PUBLIC_PROFIT` entities require `stockSymbol` and `stockExchange` fields.
+
+**Vertical Types:** `AUTOMOTIVE`, `AGRICULTURE`, `BANKING`, `COMMUNICATION`, `CONSTRUCTION`, `EDUCATION`, `ENERGY`, `ENTERTAINMENT`, `GOVERNMENT`, `HEALTHCARE`, `HOSPITALITY`, `INSURANCE`, `LEGAL`, `MANUFACTURING`, `NON_PROFIT`, `PROFESSIONAL`, `REAL_ESTATE`, `RETAIL`, `TECHNOLOGY`, `TRANSPORTATION`
+
+### Campaign Registration
+
+Register and manage campaigns for TCR carrier vetting.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Create a campaign
+$campaign = $ccai->campaigns->create([
+    'brandId'          => 1,
+    'useCase'          => 'MIXED',
+    'subUseCases'      => ['CUSTOMER_CARE', 'TWO_FACTOR_AUTHENTICATION', 'ACCOUNT_NOTIFICATION'],
+    'description'      => 'Security codes and support messaging.',
+    'messageFlow'      => 'Users opt-in via signup form at https://example.com/signup',
+    'hasEmbeddedLinks' => true,
+    'hasEmbeddedPhone' => false,
+    'isAgeGated'       => false,
+    'isDirectLending'  => false,
+    'optInKeywords'    => ['START'],
+    'optInMessage'     => 'Welcome! Reply STOP to cancel.',
+    'optInProofUrl'    => 'https://example.com/opt-in-proof.png',
+    'helpKeywords'     => ['HELP'],
+    'helpMessage'      => 'For HELP email support@example.com.',
+    'optOutKeywords'   => ['STOP'],
+    'optOutMessage'    => 'STOP received. You are unsubscribed.',
+    'sampleMessages'   => [
+        'Your code is 554321. Reply STOP to cancel.',
+        'Your ticket has been updated. Reply HELP for info.',
+    ],
+]);
+echo "Campaign created with ID: " . $campaign['id'] . "\n";
+
+// Get a campaign by ID
+$fetched = $ccai->campaigns->get($campaign['id']);
+
+// List all campaigns
+$campaigns = $ccai->campaigns->list();
+echo "Found " . count($campaigns) . " campaign(s)\n";
+
+// Update a campaign (partial update)
+$ccai->campaigns->update($campaign['id'], [
+    'description' => 'Updated description.',
+]);
+
+// Delete a campaign
+$ccai->campaigns->delete($campaign['id']);
+```
+
+**Use Cases:** `TWO_FACTOR_AUTHENTICATION`, `ACCOUNT_NOTIFICATION`, `CUSTOMER_CARE`, `DELIVERY_NOTIFICATION`, `FRAUD_ALERT`, `HIGHER_EDUCATION`, `LOW_VOLUME_MIXED`, `MARKETING`, `MIXED`, `POLLING_VOTING`, `PUBLIC_SERVICE_ANNOUNCEMENT`, `SECURITY_ALERT`
+
+> Note: `MIXED` and `LOW_VOLUME_MIXED` campaigns require 2–3 `subUseCases`.
+
+**Sub-Use Cases:** `TWO_FACTOR_AUTHENTICATION`, `ACCOUNT_NOTIFICATION`, `CUSTOMER_CARE`, `DELIVERY_NOTIFICATION`, `FRAUD_ALERT`, `MARKETING`, `POLLING_VOTING`
+
 ### Webhooks
 
 ```php
@@ -366,6 +490,8 @@ This repository includes example files for sending SMS, MMS, and Email messages:
 - Schedule emails for future delivery
 - Manage contact opt-out preferences (setDoNotText)
 - Validate email addresses (valid/invalid/risky) and phone numbers (valid/invalid/landline)
+- Brand registration and management for TCR verification
+- Campaign registration and management for TCR carrier vetting
 - Webhook management: register, update, list, delete
 - Webhook event handling for web frameworks
 - Webhook signature verification (HMAC-SHA256 with Base64 encoding)
