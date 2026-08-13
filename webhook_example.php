@@ -35,14 +35,14 @@ try {
 
     // Example 4: Update webhook
     echo "\n4. Updating webhook...\n";
-    $updatedWebhook = $ccai->webhook->update($webhook['id'], [
+    $updatedWebhook = $ccai->webhook->update((string) $webhook['id'], [
         'url' => 'https://your-domain.com/api/ccai-webhook-v3'
     ]);
     echo "Webhook updated to URL: {$updatedWebhook['url']}\n";
 
     // Example 5: Delete webhook
     echo "\n5. Deleting webhook...\n";
-    $result = $ccai->webhook->delete($webhook['id']);
+    $result = $ccai->webhook->delete((string) $webhook['id']);
     if ($result['success']) {
         echo "Webhook deleted successfully\n";
     }
@@ -54,33 +54,30 @@ try {
 // Example 6: Signature verification example
 echo "\n6. Signature Verification Example...\n";
 
+$clientId = $ccai->getClientId();
 $webhookSecret = 'my-webhook-secret-key';
 $webhookPayload = json_encode([
-    'type' => 'message.sent',
-    'campaign' => [
-        'id' => 12345,
-        'title' => 'Test Campaign',
-        'message' => 'Test message',
-        'senderPhone' => '+15551234567',
-        'createdAt' => '2025-01-17T10:00:00Z',
-        'runAt' => '2025-01-17T10:00:00Z'
+    'eventType' => 'message.sent',
+    'eventHash' => 'abc123def456ghi789',
+    'data' => [
+        'To' => '+15559876543',
+        'From' => '+15551234567',
+        'Message' => 'Hello, this is a test message!',
+        'CampaignId' => '12345',
+        'CampaignTitle' => 'Test Campaign',
     ],
-    'from' => '+15551234567',
-    'to' => '+15559876543',
-    'message' => 'Hello, this is a test message!'
 ]);
 
-// Compute the expected signature
-$expectedSignature = hash_hmac('sha256', $webhookPayload, $webhookSecret);
+// In a real handler, the signature comes from the X-CCAI-Signature header
+// and eventHash comes from the parsed payload — this just demonstrates the call.
+$event = $ccai->webhook->parseWebhookEvent($webhookPayload);
+$signatureFromHeader = 'signature-value-from-x-ccai-signature-header';
 
-// Verify the signature
-$isValid = $ccai->webhook->verifySignature($expectedSignature, $webhookPayload, $webhookSecret);
+$isValid = $ccai->webhook->verifySignature($signatureFromHeader, $clientId, $event['eventHash'], $webhookSecret);
 echo "Signature verification result: " . ($isValid ? "VALID" : "INVALID") . "\n";
 
-// Parse the webhook event
-$event = $ccai->webhook->parseWebhookEvent($webhookPayload);
-echo "Parsed event type: {$event['type']}\n";
-echo "Campaign ID: {$event['campaign']['id']}\n";
-echo "Message: {$event['message']}\n";
+echo "Parsed event type: {$event['eventType']}\n";
+echo "Campaign ID: {$event['data']['CampaignId']}\n";
+echo "Message: {$event['data']['Message']}\n";
 
 echo "\nWebhook functionality demonstration completed!\n";

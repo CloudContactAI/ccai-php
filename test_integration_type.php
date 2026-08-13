@@ -1,21 +1,20 @@
 <?php
 require 'vendor/autoload.php';
 
-use CloudContactAI\CCAI;
-use CloudContactAI\Webhook\WebhookConfig;
-
 // Test con ALL (actual)
 echo "=== Test 1: integrationType = 'ALL' ===\n";
-$config1 = new WebhookConfig();
-$config1->url = 'https://webhook.site/test-all';
-$config1->integrationType = 'ALL';
+$config1 = [
+    'url' => 'https://webhook.site/test-all',
+    'integrationType' => 'ALL',
+];
 echo "Config con ALL: " . json_encode($config1) . "\n\n";
 
 // Test con DEFAULT (antes)
 echo "=== Test 2: integrationType = 'DEFAULT' ===\n";
-$config2 = new WebhookConfig();
-$config2->url = 'https://webhook.site/test-default';
-$config2->integrationType = 'DEFAULT';
+$config2 = [
+    'url' => 'https://webhook.site/test-default',
+    'integrationType' => 'DEFAULT',
+];
 echo "Config con DEFAULT: " . json_encode($config2) . "\n\n";
 
 // Comparar

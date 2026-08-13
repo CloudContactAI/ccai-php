@@ -12,7 +12,7 @@ composer require cloudcontactai/ccai-php
 
 - PHP 8.1 or higher
 - Composer
-- GuzzleHttp 7.0+
+- GuzzleHttp 7.7+
 
 ## Configuration
 
@@ -158,9 +158,7 @@ try {
 require 'vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
-use CloudContactAI\CCAI\Email\Account;
-use CloudContactAI\CCAI\Email\EmailCampaign;
-use CloudContactAI\CCAI\Email\EmailOptions;
+use CloudContactAI\CCAI\Email\EmailAccount;
 
 // Initialize the client
 $ccai = new CCAI([
@@ -174,7 +172,7 @@ $response = $ccai->email->sendSingle(
     lastName: 'Doe',
     email: 'john@example.com',
     subject: 'Welcome to Our Service',
-    message: '<p>Hello John,</p><p>Thank you for signing up!</p>',
+    htmlContent: '<p>Hello John,</p><p>Thank you for signing up!</p>',
     senderEmail: 'noreply@yourcompany.com',
     replyEmail: 'support@yourcompany.com',
     senderName: 'Your Company',
@@ -185,34 +183,21 @@ echo "Email sent successfully!\n";
 
 // Send email campaign to multiple recipients
 $accounts = [
-    new Account('John', 'Doe', 'john@example.com'),
-    new Account('Jane', 'Smith', 'jane@example.com')
+    new EmailAccount('John', 'Doe', 'john@example.com'),
+    new EmailAccount('Jane', 'Smith', 'jane@example.com')
 ];
 
-$campaign = new EmailCampaign(
-    subject: 'Monthly Newsletter',
-    title: 'July 2025 Newsletter',
-    message: '<h1>Hello ${firstName}!</h1><p>Monthly updates...</p>',
-    senderEmail: 'newsletter@yourcompany.com',
-    replyEmail: 'support@yourcompany.com',
-    senderName: 'Your Company Newsletter',
-    accounts: $accounts
-);
+$campaign = [
+    'accounts'    => array_map(fn(EmailAccount $a) => $a->toArray(), $accounts),
+    'subject'     => 'Monthly Newsletter',
+    'title'       => 'July 2025 Newsletter',
+    'message'     => '<h1>Hello ${firstName}!</h1><p>Monthly updates...</p>',
+    'senderEmail' => 'newsletter@yourcompany.com',
+    'replyEmail'  => 'support@yourcompany.com',
+    'senderName'  => 'Your Company Newsletter',
+];
 
-// Schedule for future delivery
-$tomorrow = new DateTime('tomorrow 10:00:00');
-$campaign->scheduledTimestamp = $tomorrow->format('c');
-$campaign->scheduledTimezone = 'America/New_York';
-
-// Add progress tracking
-$options = new EmailOptions(
-    timeout: 60,
-    onProgress: function($status) {
-        echo "Progress: $status\n";
-    }
-);
-
-$response = $ccai->email->sendCampaign($campaign, $options);
+$response = $ccai->email->sendCampaign($campaign);
 echo "Campaign sent successfully!\n";
 ```
 
@@ -417,9 +402,6 @@ $ccai->campaigns->delete($campaign['id']);
 require 'vendor/autoload.php';
 
 use CloudContactAI\CCAI\CCAI;
-use CloudContactAI\CCAI\Webhook\WebhookConfig;
-use CloudContactAI\CCAI\Webhook\WebhookEventType;
-
 // Initialize the client
 $ccai = new CCAI([
     'clientId' => 'YOUR-CLIENT-ID',
@@ -427,24 +409,19 @@ $ccai = new CCAI([
 ]);
 
 // Example 1: Register a webhook with auto-generated secret
-// If secret is not provided, the server will auto-generate one
-$config = new WebhookConfig(
-    url: 'https://your-domain.com/api/ccai-webhook',
-    events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED]
-    // secret is optional - server will auto-generate and return it
-);
-$webhook = $ccai->webhook->register($config);
+// If secretKey is not provided, the server will auto-generate one
+$webhook = $ccai->webhook->register([
+    'url' => 'https://your-domain.com/api/ccai-webhook',
+]);
 
 echo "Webhook registered with ID: {$webhook['id']}\n";
 echo "Auto-generated Secret: {$webhook['secretKey']}\n";
 
 // Example 2: Register a webhook with a custom secret
-$configCustom = new WebhookConfig(
-    url: 'https://your-domain.com/api/ccai-webhook-v2',
-    secret: 'your-custom-secret-key',
-    events: [WebhookEventType::MESSAGE_SENT, WebhookEventType::MESSAGE_RECEIVED]
-);
-$webhookWithCustomSecret = $ccai->webhook->register($configCustom);
+$webhookWithCustomSecret = $ccai->webhook->register([
+    'url' => 'https://your-domain.com/api/ccai-webhook-v2',
+    'secretKey' => 'your-custom-secret-key',
+]);
 
 echo "Webhook with custom secret registered: {$webhookWithCustomSecret['id']}\n";
 
@@ -453,14 +430,14 @@ $webhooks = $ccai->webhook->list();
 echo "Found " . count($webhooks) . " webhooks\n";
 
 // Update a webhook
-$updated = $ccai->webhook->update($webhook['id'], [
+$updated = $ccai->webhook->update((string) $webhook['id'], [
     'url' => 'https://your-domain.com/api/new-webhook-endpoint'
 ]);
 
 echo "Webhook updated: {$updated['url']}\n";
 
 // Delete a webhook
-$ccai->webhook->delete($webhook['id']);
+$ccai->webhook->delete((string) $webhook['id']);
 echo "Webhook deleted\n";
 
 // Verify webhook signature in your HTTP handler
@@ -484,6 +461,142 @@ if ($ccai->webhook->verifySignature($signature, $clientId, $eventHash, $secret))
     exit;
 }
 ```
+
+### Brand Registration
+
+Register and manage brands for TCR (The Campaign Registry) business verification.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Create a brand
+$brand = $ccai->brands->create([
+    'legalCompanyName' => 'Collect.org Inc.',
+    'dba' => 'Collect',
+    'entityType' => 'NON_PROFIT',
+    'taxId' => '123456789',
+    'taxIdCountry' => 'US',
+    'country' => 'US',
+    'verticalType' => 'NON_PROFIT',
+    'websiteUrl' => 'https://www.collect.org',
+    'street' => '123 Main Street',
+    'city' => 'San Francisco',
+    'state' => 'CA',
+    'postalCode' => '94105',
+    'contactFirstName' => 'Jane',
+    'contactLastName' => 'Doe',
+    'contactEmail' => 'jane@collect.org',
+    'contactPhone' => '+14155551234',
+]);
+echo "Brand created with ID: {$brand['id']}\n";
+
+// Get a brand by ID
+$fetched = $ccai->brands->get($brand['id']);
+echo "Website match score: " . ($fetched['websiteMatchScore'] ?? 'pending') . "\n";
+
+// List all brands for the account
+$brands = $ccai->brands->list();
+echo "Found " . count($brands) . " brand(s)\n";
+
+// Update a brand (partial update)
+$updated = $ccai->brands->update($brand['id'], [
+    'street' => '456 Oak Avenue',
+    'city' => 'Los Angeles',
+]);
+
+// Delete a brand
+$ccai->brands->delete($brand['id']);
+```
+
+#### Entity Types
+
+`PRIVATE_PROFIT`, `PUBLIC_PROFIT`, `NON_PROFIT`, `GOVERNMENT`, `SOLE_PROPRIETOR`
+
+> Note: `PUBLIC_PROFIT` entities require `stockSymbol` and `stockExchange` fields.
+
+#### Vertical Types
+
+`AUTOMOTIVE`, `AGRICULTURE`, `BANKING`, `COMMUNICATION`, `CONSTRUCTION`, `EDUCATION`, `ENERGY`, `ENTERTAINMENT`, `GOVERNMENT`, `HEALTHCARE`, `HOSPITALITY`, `INSURANCE`, `LEGAL`, `MANUFACTURING`, `NON_PROFIT`, `PROFESSIONAL`, `REAL_ESTATE`, `RETAIL`, `TECHNOLOGY`, `TRANSPORTATION`
+
+### Campaign Registration
+
+Register and manage campaigns for TCR (The Campaign Registry) carrier vetting. Each campaign must be linked to a verified brand.
+
+```php
+<?php
+
+require 'vendor/autoload.php';
+
+use CloudContactAI\CCAI\CCAI;
+
+$ccai = new CCAI([
+    'clientId' => 'YOUR-CLIENT-ID',
+    'apiKey' => 'YOUR-API-KEY'
+]);
+
+// Create a campaign
+$campaign = $ccai->campaigns->create([
+    'brandId' => 1,
+    'useCase' => 'MIXED',
+    'subUseCases' => ['CUSTOMER_CARE', 'TWO_FACTOR_AUTHENTICATION', 'ACCOUNT_NOTIFICATION'],
+    'description' => 'Security codes and support messaging.',
+    'messageFlow' => 'Users opt-in via signup form at https://example.com/signup',
+    'termsLink' => 'https://example.com/terms',
+    'privacyLink' => 'https://example.com/privacy',
+    'hasEmbeddedLinks' => true,
+    'hasEmbeddedPhone' => false,
+    'isAgeGated' => false,
+    'isDirectLending' => false,
+    'optInKeywords' => ['START'],
+    'optInMessage' => 'Welcome! Reply STOP to cancel.',
+    'optInProofUrl' => 'https://example.com/opt-in-proof.png',
+    'helpKeywords' => ['HELP'],
+    'helpMessage' => 'For HELP email support@example.com.',
+    'optOutKeywords' => ['STOP'],
+    'optOutMessage' => 'STOP received. You are unsubscribed.',
+    'sampleMessages' => [
+        'Your code is 554321. Reply STOP to cancel.',
+        'Your ticket has been updated. Reply HELP for info.',
+    ],
+]);
+echo "Campaign created with ID: {$campaign['id']}\n";
+
+// Get a campaign by ID
+$fetched = $ccai->campaigns->get($campaign['id']);
+
+// List all campaigns for the account
+$campaigns = $ccai->campaigns->list();
+echo "Found " . count($campaigns) . " campaign(s)\n";
+
+// Update a campaign (partial update)
+$updated = $ccai->campaigns->update($campaign['id'], [
+    'description' => 'Updated description.',
+]);
+
+// Delete a campaign
+$ccai->campaigns->delete($campaign['id']);
+```
+
+#### Use Cases
+
+`TWO_FACTOR_AUTHENTICATION`, `ACCOUNT_NOTIFICATION`, `CUSTOMER_CARE`, `DELIVERY_NOTIFICATION`, `FRAUD_ALERT`, `HIGHER_EDUCATION`, `LOW_VOLUME_MIXED`, `MARKETING`, `MIXED`, `POLLING_VOTING`, `PUBLIC_SERVICE_ANNOUNCEMENT`, `SECURITY_ALERT`
+
+> Note: `MIXED` and `LOW_VOLUME_MIXED` campaigns require 2–3 `subUseCases`.
+
+> `termsLink` and `privacyLink` are optional fields on the campaign array.
+
+#### Sub-Use Cases
+
+`TWO_FACTOR_AUTHENTICATION`, `ACCOUNT_NOTIFICATION`, `CUSTOMER_CARE`, `DELIVERY_NOTIFICATION`, `FRAUD_ALERT`, `MARKETING`, `POLLING_VOTING`
 
 ### Example Files
 
