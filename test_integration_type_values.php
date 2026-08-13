@@ -1,7 +1,7 @@
 <?php
 require 'vendor/autoload.php';
 
-use CloudContactAI\CCAI;
+use CloudContactAI\CCAI\CCAI;
 
 $ccai = new CCAI(['clientId' => 'test', 'apiKey' => 'test']);
 
