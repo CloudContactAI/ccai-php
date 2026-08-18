@@ -9,6 +9,7 @@ composer.lock
 # PHPUnit
 /phpunit.xml
 .phpunit.result.cache
+.phpunit.cache/
 
 # PHP CS Fixer
 .php_cs.cache

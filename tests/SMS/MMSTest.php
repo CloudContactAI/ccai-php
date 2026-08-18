@@ -436,6 +436,7 @@ class MMSTest extends TestCase
             [$account],
             $message,
             $title,
+            null,
             $options
         );
 
@@ -624,6 +625,7 @@ class MMSTest extends TestCase
             [$account],
             $message,
             $title,
+            null,
             $options
         );
 
@@ -720,6 +722,7 @@ class MMSTest extends TestCase
             [$account],
             $message,
             $title,
+            null,
             $options
         );
 

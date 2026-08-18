@@ -147,7 +147,7 @@ class EmailTest extends TestCase
                 '/campaigns',
                 [
                     'accounts'     => [
-                        ['firstName' => 'Alice', 'lastName' => 'Wonder', 'email' => 'alice@example.com'],
+                        ['firstName' => 'Alice', 'lastName' => 'Wonder', 'email' => 'alice@example.com', 'phone' => ''],
                     ],
                     'subject'      => 'Welcome',
                     'title'        => 'Welcome',
@@ -170,6 +170,7 @@ class EmailTest extends TestCase
             'alice@example.com',
             'Welcome',
             '<p>Welcome Alice!</p>',
+            null,
             'no-reply@example.com',
             'support@example.com',
             'Support Team'
