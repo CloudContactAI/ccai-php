@@ -1,9 +1,10 @@
 <?php
 
 /**
- * CCAI PHP SDK Integration Tests — 52 tests
+ * CCAI PHP SDK Integration Tests — 54 tests
  * Covers: SMS (1-6), MMS (7-17), Email (18-22), Webhook (23-29), Contact (30-31),
- * Brands (32-36), Campaigns (37-42), ContactValidator (43-46), Negative cases (47-52)
+ * Brands (32-36), Campaigns (37-42), ContactValidator (43-46), Negative cases (47-52),
+ * SMS Templates (53-54)
  *
  * Test results use three states:
  *   PASS — the test ran and all assertions held
@@ -93,7 +94,7 @@ $requiredEnv = [
     'CCAI_TEST_FIRST_NAME', 'CCAI_TEST_LAST_NAME',
     'CCAI_TEST_FIRST_NAME_2', 'CCAI_TEST_LAST_NAME_2',
     'CCAI_TEST_FIRST_NAME_3', 'CCAI_TEST_LAST_NAME_3',
-    'WEBHOOK_URL',
+    'WEBHOOK_URL', 'CCAI_TEST_TEMPLATE_ID',
 ];
 $missing = array_values(array_filter($requiredEnv, static fn (string $key): bool => !getenv($key)));
 if ($missing !== []) {
@@ -115,6 +116,7 @@ $firstName2 = (string) getenv('CCAI_TEST_FIRST_NAME_2');
 $lastName2  = (string) getenv('CCAI_TEST_LAST_NAME_2');
 $firstName3 = (string) getenv('CCAI_TEST_FIRST_NAME_3');
 $lastName3  = (string) getenv('CCAI_TEST_LAST_NAME_3');
+$templateId = (int) getenv('CCAI_TEST_TEMPLATE_ID');
 
 // Unique per-run suffix so parallel SDK runs don't collide on the same webhook URL
 $runId       = 'php-' . time();
@@ -826,6 +828,21 @@ try {
         $accounts = [new SmsAccount($firstName1, $lastName1, $phone1)];
         $fakeKey  = "{$clientId}/campaign/nonexistent_" . time() . '.png';
         $res = $client->mms->send($fakeKey, $accounts, 'nonexistent fileKey accepted', 'PHP Permissive 52');
+        assertSendResponse($res);
+    }, $passed, $failed, $skipped);
+
+    echo "\n--- SMS Templates ---\n";
+
+    runTest('53 SMS sendWithTemplate', function () use ($client, $firstName1, $lastName1, $phone1, $firstName2, $lastName2, $phone2, $templateId) {
+        $res = $client->sms->sendWithTemplate([
+            new SmsAccount($firstName1, $lastName1, $phone1),
+            new SmsAccount($firstName2, $lastName2, $phone2),
+        ], $templateId, 'PHP Template Test');
+        assertSendResponse($res);
+    }, $passed, $failed, $skipped);
+
+    runTest('54 SMS sendSingleWithTemplate', function () use ($client, $firstName1, $lastName1, $phone1, $templateId) {
+        $res = $client->sms->sendSingleWithTemplate($firstName1, $lastName1, $phone1, $templateId, 'PHP Single Template Test');
         assertSendResponse($res);
     }, $passed, $failed, $skipped);
 } finally {

@@ -361,8 +361,9 @@ class SMSTest extends TestCase
 
     public function testSendWithTemplateId(): void
     {
-        $mockResponse = ['id' => 'msg-tpl-1', 'status' => 'sent', 'campaignId' => 'camp-tpl-1'];
-        $this->mockHttp->method('post')->willReturn($mockResponse);
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->andReturn(['id' => 'msg-tpl-1', 'status' => 'sent', 'campaignId' => 'camp-tpl-1']);
 
         $accounts = [new Account('John', 'Doe', '+15551234567')];
         $response = $this->ccai->sms->sendWithTemplate(
@@ -376,8 +377,9 @@ class SMSTest extends TestCase
 
     public function testSendSingleWithTemplateId(): void
     {
-        $mockResponse = ['id' => 'msg-tpl-2', 'status' => 'sent'];
-        $this->mockHttp->method('post')->willReturn($mockResponse);
+        $this->ccai->shouldReceive('request')
+            ->once()
+            ->andReturn(['id' => 'msg-tpl-2', 'status' => 'sent']);
 
         $response = $this->ccai->sms->sendSingleWithTemplate(
             firstName: 'Jane',
