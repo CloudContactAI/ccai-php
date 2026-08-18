@@ -55,7 +55,7 @@ class SMS
             throw new InvalidArgumentException('At least one account is required');
         }
 
-        if (empty($message)) {
+        if (empty($message) && $templateId === null) {
             throw new InvalidArgumentException('Message is required');
         }
 
