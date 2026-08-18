@@ -359,4 +359,35 @@ class SMSTest extends TestCase
         );
     }
 
+    public function testSendWithTemplateId(): void
+    {
+        $mockResponse = ['id' => 'msg-tpl-1', 'status' => 'sent', 'campaignId' => 'camp-tpl-1'];
+        $this->mockHttp->method('post')->willReturn($mockResponse);
+
+        $accounts = [new Account('John', 'Doe', '+15551234567')];
+        $response = $this->ccai->sms->sendWithTemplate(
+            accounts: $accounts,
+            templateId: 12345,
+            title: 'Template Campaign'
+        );
+
+        $this->assertEquals('msg-tpl-1', $response->id);
+    }
+
+    public function testSendSingleWithTemplateId(): void
+    {
+        $mockResponse = ['id' => 'msg-tpl-2', 'status' => 'sent'];
+        $this->mockHttp->method('post')->willReturn($mockResponse);
+
+        $response = $this->ccai->sms->sendSingleWithTemplate(
+            firstName: 'Jane',
+            lastName: 'Smith',
+            phone: '+15559876543',
+            templateId: 99,
+            title: 'Single Template Campaign'
+        );
+
+        $this->assertEquals('msg-tpl-2', $response->id);
+    }
+
 }
