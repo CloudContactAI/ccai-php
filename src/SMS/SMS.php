@@ -48,7 +48,7 @@ class SMS
      * 
      * @throws InvalidArgumentException If required parameters are missing or invalid
      */
-    public function send(array $accounts, string $message, string $title, ?string $senderPhone = null, ?SMSOptions $options = null): SMSResponse
+    public function send(array $accounts, string $message, string $title, ?string $senderPhone = null, ?SMSOptions $options = null, ?int $templateId = null): SMSResponse
     {
         // Validate inputs
         if (empty($accounts)) {
@@ -106,6 +106,9 @@ class SMS
         if ($senderPhone !== null) {
             $campaignData['senderPhone'] = $senderPhone;
         }
+        if ($templateId !== null) {
+            $campaignData['templateId'] = $templateId;
+        }
 
         try {
             // Notify progress if callback provided
@@ -159,6 +162,31 @@ class SMS
         $account = new Account($firstName, $lastName, $phone, null, $customData);
 
         return $this->send([$account], $message, $title, $senderPhone, $options);
+    }
+
+    /**
+     * Send SMS using a pre-approved template (for template-controlled accounts).
+     *
+     * @param array       $accounts     Array of Account objects or arrays
+     * @param int         $templateId   ID of the approved template
+     * @param string      $title        Campaign title
+     * @param string|null $senderPhone  Optional sender phone number
+     * @param SMSOptions|null $options  Optional settings
+     *
+     * @return SMSResponse API response
+     */
+    public function sendWithTemplate(array $accounts, int $templateId, string $title, ?string $senderPhone = null, ?SMSOptions $options = null): SMSResponse
+    {
+        return $this->send($accounts, '', $title, $senderPhone, $options, $templateId);
+    }
+
+    /**
+     * Send SMS to a single recipient using a pre-approved template.
+     */
+    public function sendSingleWithTemplate(string $firstName, string $lastName, string $phone, int $templateId, string $title, ?string $senderPhone = null, ?SMSOptions $options = null): SMSResponse
+    {
+        $account = new Account($firstName, $lastName, $phone);
+        return $this->sendWithTemplate([$account], $templateId, $title, $senderPhone, $options);
     }
 
 }
