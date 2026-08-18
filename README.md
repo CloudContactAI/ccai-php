@@ -77,6 +77,32 @@ $campaignResponse = $ccai->sms->send(
 echo "Campaign sent with ID: " . $campaignResponse->campaignId . "\n";
 ```
 
+### SMS — Template-Controlled Accounts
+
+If an account has been configured to enforce template-only messaging, all campaigns must reference a pre-approved template ID. Sending a free-text message to such an account will result in a `422` error.
+
+```php
+// Send to multiple recipients using a template
+$response = $ccai->sms->sendWithTemplate(
+    accounts: $accounts,
+    templateId: 12345,   // the ID of the approved template
+    title: 'My Campaign'
+);
+
+// Send to a single recipient using a template
+$response = $ccai->sms->sendSingleWithTemplate(
+    firstName: 'John',
+    lastName: 'Doe',
+    phone: '+15551234567',
+    templateId: 12345,
+    title: 'My Campaign'
+);
+
+echo "Campaign sent with ID: " . $response->campaignId . "\n";
+```
+
+The message body is resolved server-side from the template. Variable substitution (e.g. `${firstName}`) is applied automatically using the recipient's account data.
+
 ### Sending MMS Messages
 
 ```php
