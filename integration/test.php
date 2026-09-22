@@ -4,7 +4,7 @@
  * CCAI PHP SDK Integration Tests — 54 tests
  * Covers: SMS (1-6), MMS (7-17), Email (18-22), Webhook (23-29), Contact (30-31),
  * Brands (32-36), Campaigns (37-42), ContactValidator (43-46), Negative cases (47-52),
- * SMS Templates (53-54)
+ * SMS Templates (53-54, dedicated template account)
  *
  * Test results use three states:
  *   PASS — the test ran and all assertions held
@@ -94,7 +94,7 @@ $requiredEnv = [
     'CCAI_TEST_FIRST_NAME', 'CCAI_TEST_LAST_NAME',
     'CCAI_TEST_FIRST_NAME_2', 'CCAI_TEST_LAST_NAME_2',
     'CCAI_TEST_FIRST_NAME_3', 'CCAI_TEST_LAST_NAME_3',
-    'WEBHOOK_URL', 'CCAI_TEST_TEMPLATE_ID',
+    'WEBHOOK_URL',
 ];
 $missing = array_values(array_filter($requiredEnv, static fn (string $key): bool => !getenv($key)));
 if ($missing !== []) {
@@ -116,7 +116,7 @@ $firstName2 = (string) getenv('CCAI_TEST_FIRST_NAME_2');
 $lastName2  = (string) getenv('CCAI_TEST_LAST_NAME_2');
 $firstName3 = (string) getenv('CCAI_TEST_FIRST_NAME_3');
 $lastName3  = (string) getenv('CCAI_TEST_LAST_NAME_3');
-$templateId = (int) getenv('CCAI_TEST_TEMPLATE_ID');
+$templateId = getenv('CCAI_TEST_TEMPLATE_ID') ? (int) getenv('CCAI_TEST_TEMPLATE_ID') : null;
 
 // Unique per-run suffix so parallel SDK runs don't collide on the same webhook URL
 $runId       = 'php-' . time();
@@ -833,16 +833,34 @@ try {
 
     echo "\n--- SMS Templates ---\n";
 
-    runTest('53 SMS sendWithTemplate', function () use ($client, $firstName1, $lastName1, $phone1, $firstName2, $lastName2, $phone2, $templateId) {
-        $res = $client->sms->sendWithTemplate([
+    // Templates run against a separate, dedicated account (CCAI_TEMPLATE_CLIENT_ID/
+    // API_KEY): the main test account can't have template usage configured, since
+    // that starts requiring a templateId on every campaign — including the plain
+    // SMS/MMS/Email sends tested above.
+    $templateClientId = getenv('CCAI_TEMPLATE_CLIENT_ID');
+    $templateApiKey   = getenv('CCAI_TEMPLATE_API_KEY');
+
+    $makeTemplateClient = function () use ($templateClientId, $templateApiKey, $templateId) {
+        if (!$templateClientId || !$templateApiKey || !$templateId) {
+            throw new SkipTest('CCAI_TEMPLATE_CLIENT_ID/CCAI_TEMPLATE_API_KEY/CCAI_TEST_TEMPLATE_ID not set');
+        }
+        return new CCAI([
+            'clientId'           => $templateClientId,
+            'apiKey'             => $templateApiKey,
+            'useTestEnvironment' => !getenv('CCAI_BASE_URL'),
+        ]);
+    };
+
+    runTest('53 SMS sendWithTemplate', function () use ($makeTemplateClient, $firstName1, $lastName1, $phone1, $firstName2, $lastName2, $phone2, $templateId) {
+        $res = $makeTemplateClient()->sms->sendWithTemplate([
             new SmsAccount($firstName1, $lastName1, $phone1),
             new SmsAccount($firstName2, $lastName2, $phone2),
         ], $templateId, 'PHP Template Test');
         assertSendResponse($res);
     }, $passed, $failed, $skipped);
 
-    runTest('54 SMS sendSingleWithTemplate', function () use ($client, $firstName1, $lastName1, $phone1, $templateId) {
-        $res = $client->sms->sendSingleWithTemplate($firstName1, $lastName1, $phone1, $templateId, 'PHP Single Template Test');
+    runTest('54 SMS sendSingleWithTemplate', function () use ($makeTemplateClient, $firstName1, $lastName1, $phone1, $templateId) {
+        $res = $makeTemplateClient()->sms->sendSingleWithTemplate($firstName1, $lastName1, $phone1, $templateId, 'PHP Single Template Test');
         assertSendResponse($res);
     }, $passed, $failed, $skipped);
 } finally {
