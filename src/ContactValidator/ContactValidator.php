@@ -26,10 +26,42 @@ class ContactValidator
     }
 
     /**
-     * Validate a single email address
+     * Validate a single email address with Amazon SES
+     *
+     * Nothing is sent to the address. Besides `status` and `metadata.safe_to_send`, `metadata` has these optional
+     * keys (missing when the account does not have Email Address Validation, or the address was not checked):
+     *  - `verdict`: the overall verdict, 'HIGH', 'MEDIUM', 'LOW' or 'UNKNOWN'
+     *  - `checks`: six checks (hasValidSyntax, hasValidDnsRecords, mailboxExists, isRoleAddress, isDisposable,
+     *    isRandomInput), each with its own verdict
+     *  - `validatedAt`: when SES checked the address (ISO 8601); null when the address was rejected without a check
+     *  - `reused`: true when the result is a saved check from the last 30 days, instead of a new one
+     *  - `error`: why the address was rejected or could not be checked, for example 'Invalid email format'
      *
      * @param string $email Email address to validate
-     * @return array Validation result with contactField, type, status and metadata
+     * @return array{
+     *     contactField: string,
+     *     type: string,
+     *     status: string,
+     *     metadata: array{
+     *         safe_to_send?: bool,
+     *         ai_verdict?: string|null,
+     *         verdict?: string,
+     *         checks?: array{
+     *             hasValidSyntax?: string,
+     *             hasValidDnsRecords?: string,
+     *             mailboxExists?: string,
+     *             isRoleAddress?: string,
+     *             isDisposable?: string,
+     *             isRandomInput?: string
+     *         },
+     *         validatedAt?: string|null,
+     *         reused?: bool,
+     *         error?: string
+     *     }
+     * }
+     *
+     * @throws \RuntimeException With 'API Error: 403 - ...' when Email Address Validation is not enabled for the
+     *                           account, and 'API Error: 502 - ...' when SES rejects the check
      */
     public function validateEmail(string $email): array
     {
@@ -37,10 +69,15 @@ class ContactValidator
     }
 
     /**
-     * Validate multiple email addresses (up to 50)
+     * Validate multiple email addresses with Amazon SES (up to 10 per request)
+     *
+     * Every item of `results` is shaped like the result of validateEmail(). An address that SES fails to check comes
+     * back as 'invalid', with the reason in `metadata.error`.
      *
      * @param string[] $emails List of email addresses to validate
-     * @return array Bulk validation results with summary
+     * @return array{results: array[], summary: array{total: int, valid: int, invalid: int, risky: int}}
+     *
+     * @throws \RuntimeException With 'API Error: 403 - ...' when Email Address Validation is not enabled for the account
      */
     public function validateEmails(array $emails): array
     {

@@ -270,6 +270,63 @@ $bulkPhones = $ccai->contactValidator->validatePhones([
 echo "Landline: " . $bulkPhones['summary']['landline'] . "\n"; // 1
 ```
 
+#### Email validation details
+
+Email validation uses Amazon SES. Nothing is sent to the address. Besides `status` and `metadata['safe_to_send']`, each email result has these optional keys in `metadata` (they are missing when the response does not have them):
+
+| Key | Type | Description |
+|---|---|---|
+| `verdict` | `string` | The overall verdict: `'HIGH'`, `'MEDIUM'`, `'LOW'` or `'UNKNOWN'`. A verdict SES does not return is `'UNKNOWN'`. |
+| `checks` | `array` | Six checks, each with its own verdict (see below). |
+| `validatedAt` | `string\|null` | When SES checked the address (ISO 8601). `null` when the address was rejected without a check. |
+| `reused` | `bool` | `true` when the result is a saved check from the last 30 days, instead of a new one. |
+| `error` | `string` | Why the address was rejected or could not be checked, for example `'Invalid email format'`. |
+
+| Check | Meaning | Good value |
+|---|---|---|
+| `hasValidSyntax` | The address follows RFC format rules | `HIGH` |
+| `hasValidDnsRecords` | The domain exists and has DNS/MX records to receive mail | `HIGH` |
+| `mailboxExists` | The mailbox exists and can receive messages | `HIGH` |
+| `isRoleAddress` | A role address such as `admin@`, `support@` or `info@` | `LOW` |
+| `isDisposable` | A disposable or temporary email provider | `LOW` |
+| `isRandomInput` | The address looks randomly generated | `LOW` |
+
+`status` follows from the verdicts: `LOW` is `invalid`; `MEDIUM`, an unknown verdict, or a disposable address is `risky`; `HIGH` is `valid`. `safe_to_send` is `true` only for `valid`, and `ai_verdict` repeats `status`.
+
+```php
+$result = $ccai->contactValidator->validateEmail('user@example.com');
+echo $result['metadata']['verdict'];                 // "HIGH"
+echo $result['metadata']['checks']['isDisposable'];  // "LOW"
+echo $result['metadata']['validatedAt'];             // "2026-11-13T15:02:11Z"
+var_dump($result['metadata']['reused']);             // bool(false)
+
+// The keys are optional: check before reading them
+$verdict = $result['metadata']['verdict'] ?? null;
+```
+
+The keys are optional: results from before the account had Email Address Validation, and addresses that SES failed to check in a bulk request, do not have them. A saved result is reused for 30 days, so asking again for the same address inside that time is free and does not count toward the quota. Bulk email requests accept up to 10 addresses.
+
+#### Errors
+
+A failed request throws a `RuntimeException` whose message is `API Error: <status> - <body>`:
+
+| Status | When |
+|---|---|
+| `400` | The request has no body, or more than 10 emails. |
+| `403` | Email validation is not enabled for the account. Ask CloudContactAI to turn it on. |
+| `429` | The account used its quota of SES checks (10 per minute). Retry after the time in the message. |
+| `502` | SES rejected the check. The body has the AWS message. If your account uses its own AWS keys for email, the IAM user needs the `ses:GetEmailAddressInsights` permission. Single email endpoint only: in a bulk request an address that SES fails to check comes back as `invalid`, with the reason in `metadata['error']`. |
+
+```php
+try {
+    $ccai->contactValidator->validateEmail('user@example.com');
+} catch (\RuntimeException $e) {
+    if (str_starts_with($e->getMessage(), 'API Error: 403')) {
+        // Email validation is not enabled for this account
+    }
+}
+```
+
 ### Brand Registration
 
 Register and manage brands for TCR verification.
